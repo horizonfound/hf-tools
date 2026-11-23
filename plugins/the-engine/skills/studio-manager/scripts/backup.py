@@ -401,6 +401,7 @@ def main():
     ap.add_argument("--name", required=True, help="session name, e.g. 'Johnson family beach'")
     ap.add_argument("--date", default=None, help="YYYY-MM-DD, default today")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--as-folder", action="store_true", help="what is backed up was picked as a folder (Back up a folder instead), whatever is inside it: its records never call it a memory card")
     ap.add_argument("--budget", type=float, default=None, help="seconds to work before pausing cleanly (run again to continue)")
     ap.add_argument("--sample", type=int, default=None, help="a TEST only: copy just the first N files of the card (in path order). "
                     "The records say it was a sample, the report says the card is not backed up, and the card is never marked safe.")
@@ -482,7 +483,12 @@ def main():
     mpath = studio / "manifest.json"
     manifest = json.loads(mpath.read_text(encoding="utf-8")) if mpath.exists() else {"session": folder, "source": str(src), "files": {}}
     manifest["source"] = str(src)
-    manifest["source_kind"] = source_kind(src)
+    # Picked as a folder on a page ("Back up a folder instead"): a folder, even when a card's DCIM folder is
+    # inside it (a card dragged to the Desktop). No card was read, so no line may say a card is safe to format
+    # (Nov 23 review). Once a backup's records say folder, a later run never turns it back into a card.
+    manifest["source_kind"] = "folder" if (a.as_folder or manifest.get("source_kind_asked") == "folder") else source_kind(src)
+    if a.as_folder:
+        manifest["source_kind_asked"] = "folder"
     manifest["dest"] = str(dest)
     manifest["second"] = str(second) if second else None
     manifest["skipped_system_files"] = skipped

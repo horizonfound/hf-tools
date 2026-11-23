@@ -309,6 +309,23 @@ def another_card(studio, source, name):
     return not_this_card(json.loads(mpath.read_text(encoding="utf-8")), source, files, name)
 
 
+def photos_gone(root, studio):
+    """(how many of a finished backup's files are no longer where its records say, how many it has); (0, 0) when
+    that cannot be worked out. The card ledger and a backup's hidden records say a card WAS backed up; only the
+    photos being on the drive says it still is (Nov 23 review: shoot folders moved away by hand, the records left
+    behind, and the card was called already safe with not one photo looked for)."""
+    try:
+        import second_copy as rules
+        return rules.not_in_place(root, studio)
+    except Exception:  # noqa: BLE001
+        return 0, 0
+
+
+def gone_words(gone, total, root):
+    return (f"{gone:,} of its {total:,} files {'is' if gone == 1 else 'are'} no longer where the backup put them in {root} "
+            f"(moved, renamed or deleted since)")
+
+
 def folder_for(source, dest, date, name, auto):
     """Which folder this card's backup is: (session folder, the settled records of a finished backup of THIS
     card or None, the name used, plain words to stop with or None).
@@ -351,6 +368,13 @@ def folder_for(source, dest, date, name, auto):
             if why is None and st is not None and not_copied(manifest, Path(source), files):
                 why = (f"A finished backup called \"{cand}\" is already on the drive and does not hold everything on this "
                        f"card. Give this card its own name, like \"{cand} 2\", and run it again.")
+            if why is None and st is not None:
+                gone, total = photos_gone(locate(st)[0], st)
+                if gone:
+                    # this card's own finished backup, but its photos are not all on the drive any more: the card
+                    # is backed up again, under the next free name (or stops, when they gave the name themselves)
+                    why = (f"A finished backup called \"{cand}\" is on the drive, but {gone_words(gone, total, locate(st)[0])}. "
+                           f"Give this card its own name, like \"{cand} 2\", and run it again to copy it afresh.")
         if why is None:
             return session, st, cand, None
         if not auto:
@@ -512,6 +536,7 @@ def main():
     ap.add_argument("--budget", default=None, help="seconds the copy may run before pausing cleanly")
     ap.add_argument("--no-open", action="store_true", help="(kept for old callers; the report is never opened by the backup now)")
     ap.add_argument("--open", action="store_true", help="show the report of a finished backup in the browser (via serve_report.py in its own pane)")
+    ap.add_argument("--as-folder", action="store_true", help="what is backed up was picked as a folder on a page, whatever is inside it: never called a memory card")
     ap.add_argument("--again", action="store_true", help="copy even if the ledger says this card is already backed up")
     ap.add_argument("--no-peeks", action="store_true", help="skip the first-look photos (the backup still finishes and settles)")
     ap.add_argument("--check", action="store_true", help="preflight only: is everything in place for the night to run unattended? (a few seconds)")
@@ -618,7 +643,14 @@ def main():
 
     # the ledger: a card already backed up is not copied again
     if a.source and not a.session and not a.again:
-        fp, held = cards.check(a.source)
+        fp, held = cards.check(a.source, prefer=a.dest)
+        if held and (Path(held["studio"]) / "settled.json").exists():
+            gone, total = photos_gone(held["root"], held["studio"])
+            if gone:
+                # backed up before, but the photos are not all where that backup put them: never "already safe".
+                # The card is copied afresh (a backup of the same day's name takes the next free one).
+                say(f"This card was backed up on {held['when'][:10]}, but {gone_words(gone, total, held['root'])}. Copying the card again.")
+                held = None
         if held:
             root, held_studio = Path(held["root"]), Path(held["studio"])
             # done means settled: the shoots moved up into their place and the day folder gone. first-look.html
@@ -780,6 +812,8 @@ def main():
             args += ["--budget", a.budget]
         if a.sample:
             args += ["--sample", str(a.sample)]
+        if a.as_folder:
+            args += ["--as-folder"]
         code = run("backup.py", *args)
         if second_missed and (studio / "manifest.json").exists():
             # on record for the report (report_page.py reads it while the backup has no second copy); never fatal
@@ -888,7 +922,16 @@ def main():
 
     # 5. sort with the names there are (theirs, or the suggested ones)
     index = json.loads((studio / "index.json").read_text(encoding="utf-8"))
-    if any(not p.get("original") for p in index["photos"] if p.get("taken")):
+    # "sorted" means the sorter's own log says it finished: a sort cut off after it wrote the index and before
+    # its log said so (a kill, the power) is run again, and finishes from its log (Nov 23 review: it was called
+    # already sorted, the settle then refused for good, and the page called the backup Done)
+    try:
+        sort_log = json.loads((studio / "sort-log.json").read_text(encoding="utf-8"))
+        cut_off = (not sort_log.get("finished") or bool(sort_log.get("problems"))
+                   or sort_log.get("verified", 0) < len(sort_log.get("moves", [])))
+    except (OSError, ValueError):
+        cut_off = False
+    if cut_off or any(not p.get("original") for p in index["photos"] if p.get("taken")):
         say("5. Sorting into folders")
         if run("sort.py", session) != 0:
             sys.exit(1)

@@ -243,12 +243,23 @@ def refusals(work):
     (st / "manifest.json").write_text(json.dumps(m), encoding="utf-8")
     refused("a backup with a problem on record", ["--shoots", "s1", "s2"], "That backup is not fully checked yet")
     (st / "manifest.json").write_text(keep, encoding="utf-8")
-    # a photo gone from where the records say it is
+    # a photo gone from where the records say it is (deleted or moved by hand since the backup: culling) is left
+    # out and said, never a reason to refuse (version 10's last review: one culled photo blocked every join).
+    # Shown with a dry run, so this world's folders stay as they are for the checks below.
     gone = w["drive"] / "Palms_06-04-26" / "Palms_0001_IMG_4476.JPG"
     aside = w["base"] / "aside.JPG"
     os.rename(gone, aside)
-    refused("a photo missing from its folder", ["--shoots", "s1", "s2"], "is not where the backup's records say it is")
+    before = listing(w["drive"])
+    code, out = join(w, b, "--shoots", "s1", "s2", "--dry-run")
+    check("a photo missing from its folder is left out of the plan and said, never a refusal",
+          code == 0 and "no longer in its folder" in out and "left out, the rest are joined" in out and "Palms_0001_IMG_4476" not in out
+          and listing(w["drive"]) == before, out)
     os.rename(aside, gone)
+    for d in (w["drive"] / "Palms_06-04-26").iterdir():
+        os.rename(d, w["base"] / ("aside-" + d.name))
+    refused("a shoot with every photo gone from its folder", ["--shoots", "s2", "s3"], "is not where the backup's records say it is")
+    for d in w["base"].glob("aside-*"):
+        os.rename(d, w["drive"] / "Palms_06-04-26" / d.name[len("aside-"):])
     # one join at a time on this computer
     import this_computer
     (w["home"]).mkdir(exist_ok=True)

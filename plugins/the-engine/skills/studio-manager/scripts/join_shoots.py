@@ -267,6 +267,14 @@ def make_plan(session, studio, ids, name=None):
             for f in groups.get(g, {}).get("files", []):
                 if f not in known and top(f) in folders:
                     raise Stop(WORDS["no_record"].format(name=Path(f).name))
+    # a photo that is no longer in its shoot's folder (deleted or moved by hand since the backup: culling) is left
+    # out and said, never a reason to refuse the join; its record stays as it was
+    gone = [p["file"] for p in photos if not on_disk(session / p["file"])]
+    for f in folders:   # a shoot with not one of its photos left in its folder is not culling: nothing is joined
+        mine = [p["file"] for p in photos if top(p["file"]) == f]
+        if mine and all(x in gone for x in mine):
+            raise Stop(WORDS["missing"].format(name=f))
+    photos = [p for p in photos if p["file"] not in gone]
     if not photos:
         raise Stop(WORDS["missing"].format(name=folders[0]))
     photos.sort(key=lambda p: (p.get("taken") or "", p["original"]))
@@ -360,7 +368,8 @@ def make_plan(session, studio, ids, name=None):
             "folders": {s["id"]: s["folder"] for s in chosen},
             "shoots_before": [dict(s) for s in chosen], "names_before": {s["id"]: names.get(s["id"]) for s in chosen},
             "final": final.as_posix(), "staging": staging.as_posix(), "moves": moves,
-            "photos": len(stills), "clips": len(videos), "planned": now(), "problems": []}
+            "photos": len(stills), "clips": len(videos), "planned": now(), "problems": [],
+            **({"gone": gone} if gone else {})}
 
 
 # ---------------------------------------------------------------- carrying it out (the first run and every later one)
@@ -802,7 +811,7 @@ def half_done(studio):
         tos = [str(m.get("to", "")).lower() for m in e.get("moves", [])]
         real = [m for m in e.get("moves", [])     # a move an old version planned twice for one sidecar is no move
                 if not m.get("phantom") and not (not m.get("sha256") and tos.count(str(m.get("to", "")).lower()) > 1)]
-        if e.get("finished") and all(m.get("moved") for m in real):
+        if e.get("finished") and all(m.get("moved") or m.get("gone") for m in real):     # (gone: a photo they deleted; noted, not waited for)
             continue
         if e.get("problems") or len(e.get("stops") or []) >= STUCK_AFTER:
             return "stuck"
@@ -868,6 +877,10 @@ def join(session, studio, ids, name=None, dry=False, deep=False):
     say(f"  ->  {entry['final']}/   {clips.words(entry['photos'], entry['clips'])}, {len(entry['moves'])} files")
     first = entry["moves"][0]
     say(f"  e.g. {first['from']}  ->  {first['to']}")
+    if entry.get("gone"):
+        n = len(entry["gone"])
+        say(f"  ({n} of these shoots' photos {'is' if n == 1 else 'are'} no longer in {'its' if n == 1 else 'their'} folder "
+            "(deleted or moved since the backup); left out, the rest are joined.)")
     if dry:
         say("  Dry run. Nothing joined.")
         return entry

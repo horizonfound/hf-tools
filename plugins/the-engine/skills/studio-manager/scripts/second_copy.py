@@ -510,6 +510,33 @@ def on_main(key, entry, view):
     return None
 
 
+def not_in_place(root, studio):
+    """(how many of this backup's files are nowhere the records say they are on the photo drive, how many it
+    has). A look only: names and sizes, nothing is read or changed. A photo saved over since the backup (another
+    size) is still there and counts as in place. Used before a card is called "already backed up": the card
+    ledger and the hidden records are not proof that one photo is still on the drive (Nov 23 review: the shoot
+    folders had been moved away by hand, and the card was called safe to format with no photo looked for)."""
+    root, studio = Path(root), Path(studio)
+    files = (read_json(studio / "manifest.json", {}) or {}).get("files") or {}
+    view = main_view(root, studio, list(files))
+    gone = 0
+    for key, entry in files.items():
+        cands = [root / rel for rel in view["places"].get(key, [])] + [studio / "from-the-card" / Path(*key.split("/"))]
+        if studio.name == "_studio":
+            cands.append(root / Path(*key.split("/")))      # not sorted yet: still at its card path in the day folder
+        if not any(_is_file_exactly(c) for c in cands):
+            gone += 1
+    return gone, len(files)
+
+
+def _is_file_exactly(path):
+    """Is there a file with exactly this name (the folder's own listing, never a case-blind look)?"""
+    try:
+        return path.is_file() and path.name in os.listdir(path.parent)
+    except OSError:
+        return False
+
+
 def mirror_rel(loc, view, mirror_name):
     """A file's place on the second drive, from its place on the photo drive: the same shoot folder and name
     (inside the day folder too, while the backup has not settled); what the sort set aside goes in the mirror's
@@ -705,6 +732,19 @@ def align(place, mirror_name, view, studio, rec, files, save):
             if at(k) != step:
                 recs[k]["at"] = step
                 dirty = True
+        # A run killed in the instant between a file getting its new name and losing its old one leaves that
+        # one file under both names (Nov 23 review: 901 names for 900 files, "the same again" said all the same,
+        # and a later rename was blocked for good by the leftover name). Where an earlier name of the move is
+        # another name of the very same file, that old name goes; the file stays, under the name found above.
+        for m in moves:
+            step = found.get(m["key"])
+            for other in (m.get("from"), m.get("via"), m.get("to")):
+                if step and other and place_key(other) != place_key(step) and names.exact(place / other):
+                    try:
+                        if this_computer.drop_old_name(place / other, place / step):
+                            names.forget()
+                    except OSError:
+                        pass
         run["finished"] = datetime.now().isoformat(timespec="seconds") + " (cut off; picked up by a later run)"
         log_dirty = True
 
@@ -854,7 +894,8 @@ def align(place, mirror_name, view, studio, rec, files, save):
         moves.append({"key": k, "from": at(k), "to": want[k]})
     for m in moves:                     # is anything in the way that is not one of this copy's own files about to move?
         dst = place / m["to"]
-        if names.has(dst) is not None and "/".join(fold(x) for x in Path(m["to"]).parts) not in sources:
+        if names.has(dst) is not None and "/".join(fold(x) for x in Path(m["to"]).parts) not in sources \
+                and not this_computer.same_file_twice(place / m["from"], dst):     # (its own second name: see one())
             stop(OUR_WORDS["follow_in_way"])
     if out["problems"]:
         run["problems"] = list(out["problems"])
@@ -882,7 +923,10 @@ def align(place, mirror_name, view, studio, rec, files, save):
         k = m["key"]
         src, dst = place / at(k), place / dst_rel
         twin = src.parent == dst.parent and fold(src.name) == fold(dst.name)
-        if names.has(dst) is not None and not twin:
+        # the name it should take is already a second name of this very file (an earlier run was killed between
+        # giving it that name and dropping the old one): only the old name is left to drop
+        linked = not twin and this_computer.same_file_twice(src, dst)
+        if names.has(dst) is not None and not twin and not linked:
             return None
         top = Path(dst_rel).parts[0]
         if top != MIRROR_RECORDS and len(Path(dst_rel).parts) > 1 and not ours(rec, top):
@@ -893,6 +937,9 @@ def align(place, mirror_name, view, studio, rec, files, save):
             raise OSError("the place it should go is on another drive")     # never a copy-and-delete
         if twin:
             this_computer.rename(src, dst)          # only the capital letters change
+        elif linked:
+            if not this_computer.drop_old_name(src, dst):
+                return None
         elif not this_computer.rename_new(src, dst):
             return None                 # a name that appeared since the look: never taken over
         names.moved(src, dst)

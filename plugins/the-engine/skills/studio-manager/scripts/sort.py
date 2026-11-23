@@ -265,6 +265,63 @@ def stopped(log, log_path, e, phase):
     sys.exit(1)
 
 
+def write_whole(path, obj):
+    """A record written whole or not at all (a scratch name of our own, then put in place), so a sort that is
+    killed in the middle of a write never leaves half a record behind."""
+    path = Path(path)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_text(json.dumps(obj, indent=1), encoding="utf-8")
+        this_computer.replace(tmp, path)
+    except BaseException:
+        try:
+            tmp.unlink()        # our own scratch copy, never the real file
+        except OSError:
+            pass
+        raise
+
+
+def _stop_for_tests(where):
+    """For the tests only (never a photographer's computer): STUDIO_SORT_STOP_FOR_TESTS="<where>|<a marker file>"
+    ends this run on the spot at that point, once (the marker file is made first, and a run that finds it carries
+    on), as a kill or the power going would."""
+    spec = os.environ.get("STUDIO_SORT_STOP_FOR_TESTS") or ""
+    at, _, marker = spec.partition("|")
+    if at == where and marker and not os.path.exists(marker):
+        Path(marker).write_text("stopped here once", encoding="utf-8")
+        os._exit(9)
+
+
+def carried_over(session, studio, plan, log_path):
+    """The moves of an earlier sort whose log does not say "finished, every move checked, no problems", for the
+    photos that no plan holds any more because the index already carries their new place (Nov 23 review: a sort
+    killed while its last records were being written left the index saying "sorted" and the log saying no move
+    had been checked; the settle refused for good, and running the sort again wrote an empty log over the
+    unchecked one, so 600 moves were never proved). They are put back in the plan as moves already made, with the
+    proof the first run took, and are checked like any other: nothing passes unchecked, and an earlier problem is
+    found again or cleared by the check itself, never by an empty log."""
+    try:
+        before = json.loads(Path(log_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    moves = before.get("moves") or []
+    if before.get("finished") and not before.get("problems") and before.get("verified", 0) >= len(moves):
+        return []
+    index = load(studio, "index.json")
+    now = {p.get("original"): p["file"] for p in index["photos"] if p.get("original")}
+    stems = {Path(o).with_suffix("").as_posix() for o in now}
+    planned = {m["from"] for m in plan["moves"]}
+    out = []
+    for m in moves:
+        frm, to = m.get("from"), m.get("to")
+        if not frm or not to or frm in planned:
+            continue
+        sidecar = Path(frm).suffix.lower() == ".xmp" and Path(frm).with_suffix("").as_posix() in stems
+        if now.get(frm) == to or sidecar:
+            out.append(dict(m, already=True))
+    return out
+
+
 def earlier_stop(log_path):
     """The log of a sort that stopped part way (a file held open, the power), or {}."""
     if not log_path.exists():
@@ -287,6 +344,11 @@ def main():
     studio = session / "_studio"
 
     plan = make_plan(session, studio)
+    carried = carried_over(session, studio, plan, studio / "sort-log.json")
+    if carried:
+        plan["moves"] = carried + plan["moves"]
+        plan["already_sorted"] = max(0, plan["already_sorted"] - len(carried))
+        say(f"  (finishing a sort that was cut off: {len(carried)} files it moved are checked again)")
     problems = check_plan(session, plan)
     by_shoot = {}
     for m in plan["moves"]:
@@ -447,6 +509,9 @@ def main():
         log["hashed_in_full"] = hashed
         say(f"{log['verified']} of {len(plan['moves'])} checked in {time.time() - t1:.0f} s"
             + (f" ({hashed} read in full)" if hashed else ""))
+        # what was proved is on record before any other record changes: a run cut off from here on is finished
+        # by the next one from this log, never taken for a sort whose moves nobody checked
+        write_whole(log_path, log)
 
     # the index and groups now point at the new names; the original path stays beside it. Records say where
     # the files are, never where they were meant to go: if a move did not happen (a stop above), the records
@@ -465,21 +530,22 @@ def main():
         if p["file"] in new_path:
             p["original"] = p["file"]
             p["file"] = new_path[p["file"]]
-    (studio / "index.json").write_text(json.dumps(index, indent=1), encoding="utf-8")
+    write_whole(studio / "index.json", index)
+    _stop_for_tests("after-index")
     g = load(studio, "groups.json")
     for grp in g["groups"]:
         grp["files"] = [new_path.get(f, f) for f in grp["files"]]
-    (studio / "groups.json").write_text(json.dumps(g, indent=1), encoding="utf-8")
+    write_whole(studio / "groups.json", g)
     sh = load(studio, "shoots.json")
     for s in sh["shoots"]:
         fs = [m for m in plan["moves"] if m["shoot"] == s["id"]]
         if fs:
             s["name"] = fs[0]["name"]
             s["folder"] = Path(fs[0]["to"]).parts[0]   # the shoot's own folder (Photos and Videos sit inside it)
-    (studio / "shoots.json").write_text(json.dumps(sh, indent=1), encoding="utf-8")
+    write_whole(studio / "shoots.json", sh)
 
     log["finished"] = datetime.now().isoformat(timespec="seconds")
-    log_path.write_text(json.dumps(log, indent=1), encoding="utf-8")
+    write_whole(log_path, log)
     if log["problems"]:
         say("\nPROBLEMS (nothing deleted, every move is in sort-log.json):")
         for p in log["problems"][:20]:

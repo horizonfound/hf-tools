@@ -112,6 +112,15 @@ def case_twin(a, b):
     return not same_text(a, b) and a.as_posix().lower() == b.as_posix().lower()
 
 
+# A photo of the backup that is no longer in its shoot's folder (deleted or moved by hand since: ordinary
+# culling) is theirs to have removed. It is left out of a rename and said plainly, never a reason to stop
+# (Nov 23 review: one culled photo stopped the rename part way and then jammed every rename and join of that
+# backup for good). Its record stays as it was. Kept here by shoot id, between the plan and the log.
+GONE = {}
+GONE_WORDS = ("  ({n} of this shoot's photos {is_} no longer in its folder (deleted or moved since the backup); "
+              "left out, the rest {are} renamed.)")
+
+
 def plan_rename(session, studio, shoot_id, new_name):
     manifest = load(studio, "manifest.json")
     index = load(studio, "index.json")
@@ -150,8 +159,11 @@ def plan_rename(session, studio, shoot_id, new_name):
 
     moves = []
     planned_sidecars = set()   # one sidecar is planned once, however many photos share its stem (a RAW and its JPEG)
+    gone = GONE[shoot_id] = [p["file"] for p in in_folder if not on_disk(session / p["file"])]
     for p in in_folder:
         cur = Path(p["file"])
+        if p["file"] in gone:
+            continue
         into = new_folder / inside(cur).parent   # the same place inside the shoot (Photos, Videos, or the top)
         rec = files.get(p["original"])
         if not rec or not rec.get("sha256"):
@@ -197,6 +209,8 @@ def plan_rename(session, studio, shoot_id, new_name):
                                   "original": None, "sha256": sha256_of(session / sc), **({"studio": True} if ours else {"theirs": True})})
     if not moves:
         sys.exit(f"STOP: no sorted photos found in {old_folder}. Nothing renamed.")
+    if gone:
+        say(GONE_WORDS.format(n=len(gone), is_="is" if len(gone) == 1 else "are", are="are"))
     dests = [x["to"].lower() for x in moves]
     if len(set(dests)) != len(dests):
         sys.exit("STOP: two files would get the same new name. Nothing renamed.")
@@ -250,6 +264,8 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
     log = json.loads(log_path.read_text(encoding="utf-8")) if log_path.exists() else {"renames": []}
     entry = {"shoot": shoot["id"], "from_name": shoot.get("name"), "to_name": new_name,
              "started": datetime.now().isoformat(timespec="seconds"), "moves": moves, "verified": 0, "problems": []}
+    if GONE.get(shoot["id"]):
+        entry["gone"] = list(GONE[shoot["id"]])     # photos no longer in the folder when this rename was planned
     log["renames"].append(entry)
     log_path.write_text(json.dumps(log, indent=1), encoding="utf-8")
 
@@ -475,7 +491,7 @@ def finish_unfinished(session, studio):
             if not m.get("sha256") and lower_to.count(m["to"].lower()) > 1:
                 m["phantom"] = True
         real = [m for m in moves if not m.get("phantom")]
-        pending = [m for m in real if not m.get("moved")]
+        pending = [m for m in real if not m.get("moved") and not m.get("gone")]
         if entry.get("finished") and not pending:
             if resolve_phantoms(session, entry):
                 log_path.write_text(json.dumps(log, indent=1), encoding="utf-8")
@@ -532,6 +548,14 @@ def finish_unfinished(session, studio):
                 entry["problems"].append(f"{m['to']} is in the way of {src.name}; both left as they are")
             elif on_disk(src):
                 entry["problems"].append(f"never moved: {m['from']}")
+            elif folder_moved and (session / new_folder).is_dir() and on_disk(session / new_folder):
+                # The shoot's folder is there under its new name and this file is in it under neither its old
+                # name nor its new one: it was deleted or moved by hand (culled) before or during the rename.
+                # Theirs to remove: noted, never a problem, and never again a reason to stop every rename and
+                # join of this backup (Nov 23 review).
+                m["gone"] = True
+                if m["from"] not in entry.setdefault("gone", []):
+                    entry["gone"].append(m["from"])
             else:
                 entry["problems"].append(f"missing: {m['from']}")
         checked = {m["to"] for m in real if m.get("checked")}
@@ -541,7 +565,14 @@ def finish_unfinished(session, studio):
         # under its new name and matches its hash is no longer a problem (only with that proof, as above)
         mended = ({f"missing: {m['from']}" for m in real if m.get("checked")} | {f"never moved: {m['from']}" for m in real if m.get("checked")}
                   | {f"could not verify {m['to']}" for m in real if m.get("checked")})
+        # ... and so is "something was in the way of it", once what was in the way has gone and the file is under
+        # its new name, matching its hash
+        mended |= {f"{m['to']} is in the way of {Path(inside(m['from'])).name}; both left as they are" for m in real if m.get("checked")}
         entry["problems"] = [q for q in entry["problems"] if q not in mended]
+        culled = {f"missing: {m['from']}" for m in real if m.get("gone")}
+        entry["problems"] = [q for q in entry["problems"] if q not in culled]
+        if culled:
+            say(GONE_WORDS.format(n=len(culled), is_="is" if len(culled) == 1 else "are", are="were"))
         log_path.write_text(json.dumps(log, indent=1), encoding="utf-8")
         if new_folder:
             write_records(session, studio, entry["shoot"], new_folder, real, entry["to_name"])

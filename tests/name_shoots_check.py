@@ -17,6 +17,7 @@ Everything is pretend: a scratch STUDIO_HOME, pretend drives and cards, whole pr
 page server on a scratch port with STUDIO_NO_WINDOWS_FOR_TESTS. Nothing of the real ~/.studio, no /Volumes.
 """
 import http.client
+import hashlib
 import json
 import os
 import re
@@ -476,11 +477,30 @@ def cut_off_and_stuck(work):
         s = Server(w)
         s.start()
         try:
+            # a photo they moved out of a shoot's folder (culling) never stops a rename (version 10's last review:
+            # it stopped the rename part way, and then every rename and join of the backup for good)
             save(s, name, {"s1": "Aurora", "s3": "Katie"})
             d = wait_job(s, q)
             job = d.get("job") or {}
-            check("the first Save gives the true line, and the page offers Finish it", job.get("state") == "problem" and "stopped part way on something unexpected" in job.get("line", "")
-                  and d.get("half") is True, d.get("job"))
+            check("a photo moved out of a shoot's folder by hand does not stop Save the names: both shoots are renamed",
+                  job.get("state") == "done" and d.get("half") is False and d.get("stuck") is False
+                  and [x["folder"] for x in d["shoots"]] == ["Aurora_06-04-26", "Shoot 2_06-04-26", "Katie_06-04-26"], d.get("job"))
+            # a rename cut off with something of theirs in the way of a photo's new name: pressing again can't
+            # finish that (the state is laid out by hand, as a kill at that moment would leave it)
+            cw = w["drive"] / "CLIENT WORK"
+            files = sorted((cw / "Shoot 2_06-04-26").glob("*.JPG"))
+            orig = {p["file"]: p["original"] for p in jread(Path(st) / "index.json")["photos"]}
+            moves = [{"from": f"Shoot 2_06-04-26/{f.name}", "to": f"Hannah_06-04-26/{f.name.replace('Shoot_', 'Hannah_', 1)}",
+                      "original": orig[f"Shoot 2_06-04-26/{f.name}"], "sha256": hashlib.sha256(f.read_bytes()).hexdigest()} for f in files]
+            log = jread(Path(st) / "rename-log.json")
+            log["renames"].append({"shoot": "s2", "from_name": "Shoot 2", "to_name": "Hannah", "started": "2026-11-23T10:00:00",
+                                   "moves": moves, "verified": 0, "problems": []})
+            (Path(st) / "rename-log.json").write_text(json.dumps(log), encoding="utf-8")
+            os.rename(cw / "Shoot 2_06-04-26", cw / "Hannah_06-04-26")
+            in_way = cw / "Hannah_06-04-26" / Path(moves[0]["to"]).name
+            in_way.write_bytes(b"something of theirs with that very name")
+            code, d = s.json("GET", "/name-shoots-data" + q)
+            check("the cut-off rename is seen, and the page offers Finish it", d.get("half") is True and d.get("stuck") is False, d.get("job"))
             save(s, name, {})
             d = wait_job(s, q)
             job = d.get("job") or {}
@@ -489,12 +509,13 @@ def cut_off_and_stuck(work):
             code, d2 = save(s, name, {"s2": "Hannah"})
             check("and another press is answered with the same line, nothing started", d2.get("ok") is False and d2.get("words") == LOOK, d2)
             check("no path and no file name of ours anywhere in what the page gets", no_path(w, d) and ".json" not in json.dumps(d))
-            # the photo is put back where the log left it; the chat's finish command mends it
-            os.rename(away, w["drive"] / "CLIENT WORK" / "Katie_06-04-26" / "Shoot_0002_IMG_4481.JPG")
+            check("what was in the way is still there, untouched", in_way.read_bytes() == b"something of theirs with that very name")
+            # what was in the way is moved out; the chat's finish command mends it
+            os.rename(in_way, w["drive"] / "theirs.JPG")
             code, out = t.run("join_shoots.py", st, "--finish", env=w["env"])
             code2, d = s.json("GET", "/name-shoots-data" + q)
             check("once the Assistant has finished it from the chat the page is itself again", code == 0 and d.get("stuck") is False and d.get("half") is False
-                  and [x["folder"] for x in d["shoots"]] == ["Aurora_06-04-26", "Shoot 2_06-04-26", "Katie_06-04-26"], out + str(d.get("shoots")))
+                  and [x["folder"] for x in d["shoots"]] == ["Aurora_06-04-26", "Hannah_06-04-26", "Katie_06-04-26"], out + str(d.get("shoots")))
         finally:
             s.stop()
 

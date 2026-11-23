@@ -171,6 +171,9 @@ OUR_WORDS = {
     "done_plain": "Done.",
     "done_look": "Something needs a look: see the report",          # hers, from the backups list
     "done_sample": "Keep the card: this was a sample",              # the report's own words for a sample backup
+    # the backup finished, and its records can't be read right now (the drive unplugged): not a problem, said as it is
+    "done_away": "{drive} isn't plugged in right now. Plug it in to see this backup.",
+    "done_away_plain": "I can't see this backup right now. If it is on a drive, plug the drive in.",
     # a backup that stopped
     "problem_head": "The backup stopped before it finished.",
     "problem_do": "Tap here and press Start the backup again. Photos already copied are checked, not copied again.",
@@ -583,8 +586,20 @@ def started_from_folder(rec):
     if rec.get("source") == "folder":
         return True
     private = rec.get("private")
-    if isinstance(private, dict) and isinstance(private.get("is_card"), bool):
+    if isinstance(private, dict) and private.get("as_folder") is True:
+        return True                         # picked with Back up a folder instead: a folder, whatever is inside it
+    if isinstance(private, dict) and isinstance(private.get("is_card"), bool) and "as_folder" in private:
         return not private["is_card"]       # the job's own record says what it was started on (backup_job.py)
+    try:    # a record with no word of its own on it: the note this page wrote when Start was pressed
+        note = json.loads(START_NOTE.read_text(encoding="utf-8"))
+        a = datetime.fromisoformat(str(note["at"])[:19])
+        b = datetime.fromisoformat(str(rec.get("started"))[:19])
+        if bool(note.get("from_folder")) and abs((b - a).total_seconds()) <= NOTE_SLACK:
+            return True
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    if isinstance(private, dict) and isinstance(private.get("is_card"), bool):
+        return not private["is_card"]
     try:
         note = json.loads(START_NOTE.read_text(encoding="utf-8"))
         a = datetime.fromisoformat(str(note["at"])[:19])
@@ -664,6 +679,37 @@ def _records(rec):
     return found
 
 
+_CARD_KEYS = {}                 # (the card's path, how many files, its DCIM folder's own time) -> its fingerprint
+
+
+def other_card_in(rec):
+    """True when a memory card is in right now and it is NOT the card this job backed up. False when it is that
+    card, when no card is in, or when it cannot be told (a record from before the job kept the card's
+    fingerprint). The fingerprint is the card ledger's own (cards.py) and is read once per card put in, not on
+    every look."""
+    want = (rec.get("private") or {}).get("card_key") if isinstance(rec.get("private"), dict) else None
+    if not want or not isinstance(want, str):
+        return False
+    card = the_card()
+    if card is None:
+        return False
+    try:
+        stamp = os.stat(Path(card["path"]) / "DCIM").st_mtime_ns
+    except OSError:
+        stamp = 0
+    k = (card["path"], card["files"], stamp)
+    if k not in _CARD_KEYS:
+        try:
+            import cards
+            fp = cards.fingerprint(card["path"])
+            got = cards.key(fp) if fp else ""
+        except (Exception, SystemExit):  # noqa: BLE001
+            return False
+        _CARD_KEYS.clear()
+        _CARD_KEYS[k] = got
+    return _CARD_KEYS[k] != want
+
+
 def job_view(rec=None):
     """The job as the page draws it: words and numbers only, never a path. `show` says whether the home card
     shows it at all (a backup running, one that stopped, or one that finished a little while ago)."""
@@ -712,6 +758,12 @@ def job_view(rec=None):
             except (Exception, SystemExit):  # noqa: BLE001
                 pass
         v["checked"], v["sample"] = checked, sample
+        # The card that is in now is not the card this backup was made from (card 1 out, card 2 in: cameras give
+        # every card the same name). Nothing here may read as "the card in the slot is safe to format": the box
+        # leaves the finished backup's lines out, and the format line is never said (Nov 23 review).
+        other = other_card_in(rec) if not from_folder else False
+        if other:
+            v["other_card"] = True
         v["steps"] = [{"t": t, "dn": True, "on": False} for _, t in names]
         # what the job itself has to say about a finished backup, in its own plain words (never a path): the card
         # was already backed up, files set aside, nothing could be sorted, a second copy that did not finish
@@ -724,9 +776,13 @@ def job_view(rec=None):
         if checked:
             found = (W("found_one_folder") if shoots == 1 else W("found_many_folder").format(n=shoots)) if from_folder else \
                     (W("found_one") if shoots == 1 else W("found_many").format(n=shoots))
-            v.update(head=W("done_head"), sub=found if shoots else "", safe_format=not from_folder,
+            v.update(head=W("done_head"), sub=found if shoots else "", safe_format=not from_folder and not other,
                      link={"kind": "name", "words": W("name_it") if shoots == 1 else W("name_them")} if shoots else {"kind": "report", "words": W("see_report")},
                      backed=(W("backed_one") if shoots == 1 else W("backed_many").format(n=shoots)) if shoots else "")
+        elif records is None:
+            # the backup's records can't be read just now (the drive is unplugged, most likely): that is not
+            # "something needs a look". Said as what it is, with nothing claimed and nothing to open.
+            v.update(head=W("done_plain"), sub=W("done_away").format(drive=drive) if drive else W("done_away_plain"), link=None, backed="")
         elif sample:
             v.update(head=W("done_plain"), sub=W("done_sample"), link={"kind": "report", "words": W("see_report")}, backed="")
         else:
@@ -738,7 +794,9 @@ def job_view(rec=None):
     line = " ".join(str(rec.get("line") or "").split())[:300]
     v.update(head=line or W("problem_head"), sub=W("problem_do"), sub_open=W("problem_do_open"), bad=True,
              link={"kind": "report", "words": W("see_report")} if _records(rec) is not None else None)
-    if _again_ask(rec) is not None:         # the page's own job: Try again starts the same backup again
+    if rec.get("nothing") is True:          # an empty card or folder: nothing was copied, nothing to try again
+        v.update(sub="", sub_open="", link=None)
+    elif _again_ask(rec) is not None:       # the page's own job: Try again starts the same backup again
         v.update(again=W("try_again"), sub=W("problem_again"), sub_open=W("problem_again"))
     return v
 
@@ -746,7 +804,7 @@ def job_view(rec=None):
 def _again_ask(rec):
     """What Try again would start, from the job's own record (never from a page): (source, dest, second, shoot
     name), or None when the record does not say (then the card keeps its "press Start the backup again" line)."""
-    p = rec.get("private") if rec.get("state") == "problem" else None
+    p = rec.get("private") if rec.get("state") == "problem" and not rec.get("nothing") else None
     if not isinstance(p, dict) or not isinstance(p.get("source"), str) or not isinstance(p.get("dest"), str) or not p["source"] or not p["dest"]:
         return None
     second = p.get("second") if isinstance(p.get("second"), str) and p.get("second") else None
@@ -767,7 +825,7 @@ def again():
         return {"ok": False, "words": W("again_gone"), "job": job_view()}
     source, dest, second, name = ask
     try:
-        ans = mod.start(source, dest, second=second, shoot_name=name)
+        ans = _start_job(mod, source, dest, second, name, (rec.get("private") or {}).get("as_folder") is True)
     except (Exception, SystemExit) as e:  # noqa: BLE001
         _log(f"the backup could not be started again ({e.__class__.__name__}: {str(e)[:120]})")
         return {"ok": False, "words": W("cant_start"), "job": job_view()}
@@ -894,7 +952,7 @@ def start(body):
         raise Refused(got["why"], 409)
     note_start(body["source"] == "folder")
     try:
-        ans = mod.start(source, got["place"], second=second_path, shoot_name=shoot_name or None)
+        ans = _start_job(mod, source, got["place"], second_path, shoot_name or None, body["source"] == "folder")
     except (Exception, SystemExit) as e:  # noqa: BLE001
         _log(f"the backup could not be started ({e.__class__.__name__}: {str(e)[:120]})")
         return {"ok": False, "words": W("cant_start")}
@@ -905,6 +963,18 @@ def start(body):
     saved = saved_place() or {}
     where = " › ".join([saved.get("drive") or ""] + list(saved.get("folders") or [])).strip(" ›")
     return {"ok": True, "from": from_name, "where": where, "second": second["name"] if second else None, "job": job_view()}
+
+
+def _start_job(mod, source, dest, second, shoot_name, as_folder):
+    """Ask the job to start. Picked as a folder ("Back up a folder instead"), the job is told so: a folder with
+    a card's DCIM folder inside it (a card dragged to the Desktop) is still a folder, and nothing may say a card
+    is safe to format (Nov 23 review). A job module that does not know the word is started as before."""
+    if as_folder:
+        try:
+            return mod.start(source, dest, second=second, shoot_name=shoot_name, as_folder=True)
+        except TypeError:
+            pass
+    return mod.start(source, dest, second=second, shoot_name=shoot_name)
 
 
 def report_of_job():
@@ -1215,7 +1285,7 @@ const BK = (function(){
     if (!S) { sub.append(el('p', '', BW.loading)); return; }
     const run = running();
     if (run) sub.append(el('p', '', BW.run_top)); else sub.append(el('p', '', BW.safety), el('p', 'bksafe', BW.safe));
-    if (!run && job && job.show && job.state !== 'idle') top.append(prog());
+    if (!run && job && job.show && job.state !== 'idle' && !job.other_card) top.append(prog());
     // the two pictures
     const flow = el('div', 'bkflow'), arr = el('span', 'arr', '\u2192'); arr.setAttribute('aria-hidden', 'true');
     let cardT, driveT; const dn = destNames();

@@ -701,11 +701,28 @@ def job_running(tag):
             f.close()
 
 
+try:
+    from backup_lock import BEING_MADE
+except ImportError:
+    BEING_MADE = "This backup is still being made. Try this again when it's done."
+
+
+def being_made(studio):
+    """Is a backup that is running right now still working on this backup's folders?"""
+    try:
+        import backup_lock
+        return bool(backup_lock.working_on(studio))
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def job_state(studio):
     """The job's record as it truly stands: "working" only while the job itself is alive."""
     d = job_read(studio)
     if not d:
         return None
+    if d.get("state") == "problem" and BEING_MADE in str(d.get("line") or "") and not being_made(studio):
+        return None             # "still being made" is no longer true: the backup is done, so the line goes
     if d.get("state") == "working":
         try:
             young = (datetime.now() - datetime.fromisoformat(d.get("started"))).total_seconds() < STARTING_GRACE
@@ -1035,6 +1052,10 @@ def handle_post(handler, path, query):
         if ask is None:
             return _answer(handler, {"ok": False, "words": arrange.NOT_UNDERSTOOD}, 400)
         names, mini, mini_name = ask
+        if being_made(studio):
+            # refused here, as a passing line, with no job started and no record written (Nov 23 review: the job
+            # was started, refused, and left "still being made" on the page long after the backup was done)
+            return _answer(handler, {"ok": False, "words": OUR_WORDS["problem"].format(line=BEING_MADE)})
         with _SAVING:
             state = half_done(studio)
             if state == "stuck":

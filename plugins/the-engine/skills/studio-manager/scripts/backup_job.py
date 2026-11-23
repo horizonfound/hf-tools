@@ -90,6 +90,8 @@ OUR_WORDS = {
     "problem": "The backup stopped with a problem. Nothing on your card was changed. See the report for what it found.",
     "stopped": "The backup stopped before it started copying. Nothing was changed.",
     "already": "This card was already backed up, so there was nothing to copy.",
+    "empty_card": "There is nothing on this card to back up. Nothing was copied, and nothing on it was changed.",
+    "empty_folder": "There is nothing in this folder to back up. Nothing was copied, and nothing in it was changed.",
     "second_missed": "Your photos are backed up and checked. The second copy isn't made yet: {why}",
     "second_plain": "Your photos are backed up and checked. The second copy isn't finished: use Make a second copy on the report to carry on.",
     "aside_undated": "{n} with no date could not be sorted into a shoot. Copied and checked, and kept with the backup's records.",
@@ -214,7 +216,7 @@ def facts_of(p):
         # a card backed up before, on another day or under another name: the card ledger knows where
         try:
             import cards
-            _, held = cards.check(p["source"])
+            _, held = cards.check(p["source"], prefer=p.get("dest"))
             _, studio = locate(held["studio"])
         except (Exception, SystemExit):  # noqa: BLE001
             return None, None, None, None, None
@@ -362,6 +364,37 @@ def status():
                     except OSError:
                         pass
             rec = again
+    if rec.get("state") == "done" and rec.get("second") and rec.get("second_ok") is False:
+        rec = second_made_since(rec)
+    return rec
+
+
+def second_made_since(rec):
+    """A backup that ended with "second copy not made", whose second copy has been made since (the report's
+    button, or second_copy.py from the chat): the record says so from then on, and its "not made" line goes
+    (Nov 23 review: the home card and `status --words` kept saying the copy was not made after it was, while Your
+    backups said it was). Looked up in the backup's own records; anything that can't be read leaves the record
+    as it is."""
+    try:
+        import second_copy
+        from where import locate
+        _, studio = locate(rec.get("records"))
+        st = second_copy.status(studio)
+    except (Exception, SystemExit):  # noqa: BLE001
+        return rec
+    if st.get("state") != "done":
+        return rec
+    rec = dict(rec)
+    gone = rec.pop("second_line", None)
+    if gone:
+        rec["line"] = " ".join(str(rec.get("line") or "").replace(gone, " ").split())
+    rec["second_ok"] = True
+    if st.get("name"):
+        rec["second"] = st["name"]              # the drive it was made on, should it be another one
+    try:
+        write(rec)
+    except OSError:
+        pass
     return rec
 
 
@@ -409,9 +442,10 @@ def words(rec=None):
     return out
 
 
-def start(source, dest, second=None, shoot_name=None):
+def start(source, dest, second=None, shoot_name=None, as_folder=False):
     """Start the one detached job. {"ok": True} or {"ok": False, "why": plain words}. Nothing is copied here;
-    nothing on the card is read beyond whether it is there."""
+    nothing on the card is read beyond whether it is there. as_folder: it was picked as a folder ("Back up a
+    folder instead"), so it is never called a memory card, whatever is inside it."""
     try:
         HOME.mkdir(parents=True, exist_ok=True)
         gate, got = backup_lock._try(START_LOCK, tries=20)
@@ -439,7 +473,7 @@ def start(source, dest, second=None, shoot_name=None):
         drive, folders = place_words(dest)
         private = {"pid": None, "source": str(source), "dest": str(dest), "second": str(second) if second else None,
                    "shoot_name": " ".join(str(shoot_name or "").split()) or None, "name": None, "date": None, "session": None,
-                   "is_card": is_card(source)}
+                   "is_card": False if as_folder else is_card(source), "as_folder": bool(as_folder)}
         # a Try again after a stop: the same card to the same place carries on under the same name and day
         old = before.get("private") or {}
         if before.get("state") == "problem" and old.get("name") and old.get("date") \
@@ -515,6 +549,10 @@ class Job:
                "--name", self.p["name"], "--date", self.p["date"], "--by-time", "--no-second"]
         if self.p.get("shoot_name"):
             cmd += ["--shoot-name", self.p["shoot_name"]]
+        if self.p.get("again"):
+            cmd += ["--again"]
+        if self.p.get("as_folder"):
+            cmd += ["--as-folder"]
         if budget is not None:
             cmd += ["--budget", str(budget)]
         env = dict(os.environ, STUDIO_BACKUP_JOB=str(os.getpid()), PYTHONUNBUFFERED="1")
@@ -672,6 +710,20 @@ class Job:
             return self.problem(OUR_WORDS["no_card"] if self.p.get("is_card") else OUR_WORDS["no_folder"])
         if not cards.answers(src):
             return self.problem(no_path(cards.QUIET_CARD.replace("say go", "press Try again")) or OUR_WORDS["quiet"])
+        # A card the ledger knows is "already backed up" only when that backup is in the place picked for THIS
+        # one and its photos are still there. Backed up somewhere else (another drive or folder was picked today),
+        # the card is copied to the place picked: "Done" on a page names that place, so the photos must be in it
+        # (Nov 23 review: nothing was copied and the new drive was named as where the photos are).
+        try:
+            _, held = cards.check(src, prefer=self.p["dest"])
+            if held:
+                root = Path(held["root"])
+                here = backup_lock._same(root, self.p["dest"]) or backup_lock._same(root.parent, self.p["dest"])
+                if not here:
+                    self.p["again"] = True
+                    self.log("this card's earlier backup is in another place; copying it to the place picked today")
+        except (Exception, SystemExit) as e:  # noqa: BLE001  (then the backup's own rules decide, as before)
+            self.log(f"could not look the card up in the ledger: {e}")
         # the name and the day, chosen ONCE and used for every run of this job, so a rerun carries on in the
         # same folder (night.py's own rule for a card with no name: the weekday, and the next free one if taken)
         import night
@@ -700,7 +752,21 @@ class Job:
             from backup import inventory
             total = len(inventory(Path(src))[0])
         except OSError:
-            total = 0
+            total = None
+        if total == 0:
+            # nothing on it at all: said in words of its own, with nothing to try again (Nov 23 review: the
+            # chat's own stop line came out as "Nothing on the card to copy: your card", with Try again under it)
+            self.rec["nothing"] = True
+            return self.problem(OUR_WORDS["empty_card"] if self.p.get("is_card") else OUR_WORDS["empty_folder"])
+        total = total or 0
+        # which card this is (the card ledger's own fingerprint), so a page can tell this card from the next one
+        # put in: cameras give every card the same name
+        if self.p.get("is_card"):
+            try:
+                fp = cards.fingerprint(src)
+                self.p["card_key"] = cards.key(fp) if fp else None
+            except (Exception, SystemExit):  # noqa: BLE001
+                self.p["card_key"] = None
         self.save(total=total, backup=session.name)
 
         code, why, tail = None, [], []
@@ -783,6 +849,7 @@ def main():
     s.add_argument("--dest", required=True, help="the exact folder backups go in (used as given)")
     s.add_argument("--second", default=None, help="a drive or folder for a second copy, made after the backup")
     s.add_argument("--shoot-name", default=None, help="the shoot's name; used only when the card holds exactly one shoot")
+    s.add_argument("--as-folder", action="store_true", help="it was picked as a folder, whatever is inside it: never called a memory card")
     st = sub.add_parser("status")
     st.add_argument("--words", action="store_true", help="a few plain lines instead of JSON")
     st.add_argument("--page", action="store_true", help="the record as a page may have it: no paths")
@@ -790,7 +857,7 @@ def main():
     a = ap.parse_args()
     this_computer.utf8_output()
     if a.cmd == "start":
-        got = start(a.source, a.dest, a.second, a.shoot_name)
+        got = start(a.source, a.dest, a.second, a.shoot_name, as_folder=a.as_folder)
         print(json.dumps(got, ensure_ascii=False), flush=True)
         return 0 if got.get("ok") else 2
     if a.cmd == "status":
