@@ -11,7 +11,7 @@ of eight points finished by the next, every record following, and the refusals i
 Everything is pretend: a scratch STUDIO_HOME, pretend drives and cards (temp folders), whole pretend backups made
 by night.py itself. No page server, no browser, no window.
 
-    python3 tests/join_shoots_check.py [--only plain,refusals,letters,cut_off,unprovable,with_clips,settle_waits,second_copy_follows]
+    python3 tests/join_shoots_check.py [--only plain,refusals,letters,cut_off,unprovable,with_clips,review_fixes,settle_waits,second_copy_follows]
 """
 import json
 import os
@@ -421,6 +421,143 @@ def with_clips(work):
           code == 0 and "Reyes_06-04-26/Photos/Reyes_0004_IMG_4474.JPG" in got and "Reyes_06-04-26/Videos/Reyes_0003_MVI_9003.MP4" in got, out + str(got))
 
 
+def review_fixes(work):
+    print("A second join into a folder that keeps its name, with the Mac's hidden note written again")
+    w, b = world(work, "twice-note")
+    if b:
+        st = b["records"]
+        (w["drive"] / "Beach_06-04-26" / ".DS_Store").write_bytes(b"first note")
+        code, out = join(w, b, "--shoots", "s1", "s2")
+        check("the first join finishes and sets the note aside", code == 0 and (st / "from-joined" / "Beach_06-04-26" / ".DS_Store").read_bytes() == b"first note", out)
+        (w["drive"] / "Beach_06-04-26" / ".DS_Store").write_bytes(b"second note")      # as Finder does when they open the folder
+        code, out = join(w, b, "--shoots", "s1", "s3")
+        check("the second join into the same folder finishes too (exit 0), never stuck behind the note", code == 0 and "Joined." in out, out)
+        aside = st / "from-joined" / "Beach_06-04-26"
+        check("both notes are kept in the records, the first one never written over",
+              (aside / ".DS_Store").read_bytes() == b"first note" and (aside / ".DS_Store (2)").is_file()
+              and (aside / ".DS_Store (2)").read_bytes() == b"second note", sorted(os.listdir(aside)) if aside.is_dir() else None)
+        check("one folder on the drive, all twelve photos in it, no gathering folder",
+              sorted(x for x in os.listdir(w["drive"]) if not x.startswith(".")) == ["Beach_06-04-26"]
+              and sorted(os.listdir(w["drive"] / "Beach_06-04-26")) == [f"Beach_{n:04d}_IMG_{4470 + n}.JPG" for n in range(1, 13)],
+              listing(w["drive"]))
+        records_right(w, b, "after the second join", ["s1"])
+        import join_shoots
+        check("and nothing is left waiting", not join_shoots.unfinished(st) and join_shoots.half_done(st) is None)
+
+    print("Their own sidecar, saved again by their editing program between a cut-off join and its finish")
+    w, b = world(work, "sidecar-saved")
+    if b:
+        import join_shoots
+        st = b["records"]
+        xmp = w["drive"] / "Palms_06-04-26" / "Palms_0002_IMG_4477.xmp"
+        xmp.write_bytes(b"<x:xmpmeta>first edit</x:xmpmeta>")
+        code, out = join(w, b, "--shoots", "s1", "s2", STUDIO_JOIN_CUT_FOR_TESTS="moves:3")
+        now_at = [p for p in w["drive"].rglob("*.xmp") if ".studio" not in p.parts]
+        check("cut off part way; the sidecar is somewhere on the drive", code == 70 and len(now_at) == 1, f"{code} {now_at}")
+        if now_at:
+            now_at[0].write_bytes(b"<x:xmpmeta>a second, longer edit, saved while the join was cut off</x:xmpmeta>")
+        code, out = join(w, b, "--finish")
+        e = (jread(st / "join-log.json", {}).get("joins") or [{}])[0]
+        check("the finish ends clean (exit 0): a sidecar they saved again is theirs, never a problem",
+              code == 0 and e.get("finished") and not e.get("problems") and e.get("verified") == 10, out)
+        moved = w["drive"] / "Beach_06-04-26" / "Beach_0007_IMG_4477.xmp"
+        check("the sidecar is beside its photo under its new name, holding what they saved last",
+              moved.is_file() and b"second, longer edit" in moved.read_bytes(), listing(w["drive"]))
+        check("the log notes it was saved again, and the plan's own hash is kept as it was",
+              [m.get("saved_again") is not None for m in e.get("moves", []) if m.get("kind") == "sidecar"] == [True], e.get("moves", [])[-3:])
+        check("nothing waits: the backup may settle, and no later run has anything to finish", not join_shoots.unfinished(st) and join_shoots.half_done(st) is None)
+        q = jread(w["home"] / "queue.json", {})
+        mine = [x for x in q.get("shoots", []) if Path(x.get("studio", "")).resolve() == Path(st).resolve()]
+        check("the editing queue's list shows the joined shoot and no longer the joined-away one",
+              sorted(x["shoot"] for x in mine) == ["s1", "s3"] and next(x for x in mine if x["shoot"] == "s1").get("count") == 9, mine)
+        records_right(w, b, "after it", ["s1", "s3"])
+
+    print("A join that ends with a real problem at its check")
+    w, b = world(work, "real-problem")
+    if b:
+        import join_shoots
+        st = b["records"]
+        code, out = join(w, b, "--shoots", "s1", "s2", STUDIO_JOIN_CUT_FOR_TESTS="moves:3")
+        hurt = w["drive"] / "Beach_06-04-26 (joining)" / "Beach_0002_IMG_4472.JPG"
+        good = hurt.read_bytes() if hurt.is_file() else b""
+        check("cut off part way, with a photo in the gathering folder", code == 70 and bool(good), f"{code} {listing(w['drive'])}")
+        hurt.write_bytes(good + b" damaged")                    # the photo is no longer the file the plan named
+        code, out = join(w, b, "--finish")
+        e = (jread(st / "join-log.json", {}).get("joins") or [{}])[0]
+        check("the finish stops loudly (exit 1) with the problem on record", code == 1 and "PROBLEMS" in out and "not the same file after the join" in out
+              and e.get("finished") and len(e.get("problems", [])) == 1, out)
+        check("nothing settles on top of it", join_shoots.unfinished(st))
+        sh = [s_["id"] for s_ in jread(st / "shoots.json", {}).get("shoots", [])]
+        q = jread(w["home"] / "queue.json", {})
+        mine = [x for x in q.get("shoots", []) if Path(x.get("studio", "")).resolve() == Path(st).resolve()]
+        check("the records say where the files are (two shoots now), and the editing queue's list follows them: no shoot is listed in a folder that is gone",
+              sh == ["s1", "s3"] and sorted(x["shoot"] for x in mine) == ["s1", "s3"]
+              and all(Path(x["folder"]).is_dir() for x in mine) and next(x for x in mine if x["shoot"] == "s1").get("count") == 9, mine)
+        code, out = join(w, b, "--finish")
+        check("asked again, it still says so (exit 1): a problem is never quietly called finished", code == 1 and "No join is waiting" not in out, out)
+        check("a join that ended with a problem does not stand in the way of the next rename", join_shoots.half_done(st) is None)
+        code, out = t.run("rename_shoot.py", st, "--shoot", "s3", "--name", "Orchard", env=w["env"])
+        check("another shoot of the backup can still be renamed", code == 0 and (w["drive"] / "Orchard_06-04-26").is_dir(), out)
+        # the joined shoot is renamed on; the old join's entry must never write its own places back over the records
+        code, out = t.run("rename_shoot.py", st, "--shoot", "s1", "--name", "Family", env=w["env"])
+        index_then = (st / "index.json").read_bytes()
+        check("so can the joined shoot itself", code == 0 and (w["drive"] / "Family_06-04-26").is_dir(), out)
+        code, out = join(w, b, "--finish")
+        check("looking at the old join again changes no record (the shoot has moved on since)", (st / "index.json").read_bytes() == index_then and code == 1, out)
+        t.run("rename_shoot.py", st, "--shoot", "s1", "--name", "Beach", env=w["env"])
+        (w["drive"] / "Beach_06-04-26" / "Beach_0002_IMG_4472.JPG").write_bytes(good)     # the photo is put right
+        code, out = join(w, b, "--finish")
+        e = (jread(st / "join-log.json", {}).get("joins") or [{}])[0]
+        check("once every file checks out the problem is cleared (exit 0), what it was kept in the log, and nothing waits any more",
+              code == 0 and "checks out now" in out and not e.get("problems") and e.get("problems_were") and not join_shoots.unfinished(st), out)
+
+    print("A rename where two photos share one sidecar (a RAW and its JPEG), camera names kept")
+    make = t.make_card
+
+    def with_twins(card, groups=(8,)):
+        make(card, groups=groups)
+        d = card / "DCIM" / "100CANON"
+        shutil.copy2(d / "IMG_4471.JPG", d / "IMG_4471.jpeg")
+    t.make_card = with_twins
+    try:
+        w, b = world(work, "twins", groups=(3, 3), shoots=("Beach", "Palms"), file_names="original")
+    finally:
+        t.make_card = make
+    if b:
+        st = b["records"]
+        folder = w["drive"] / "Beach_06-04-26"
+        check("the shoot holds both photos of the pair", {"IMG_4471.JPG", "IMG_4471.jpeg"} <= set(os.listdir(folder)), os.listdir(folder))
+        (folder / "IMG_4471.xmp").write_bytes(b"<x:xmpmeta>one sidecar for the pair</x:xmpmeta>")
+        code, out = t.run("rename_shoot.py", st, "--shoot", "s1", "--name", "Kat", env=w["env"])
+        new = w["drive"] / "Kat_06-04-26"
+        check("the rename goes through (exit 0), the one sidecar planned once", code == 0 and "All done." in out and new.is_dir(), out)
+        check("both photos and their sidecar are in the renamed folder under the camera's names",
+              new.is_dir() and {"IMG_4471.JPG", "IMG_4471.jpeg", "IMG_4471.xmp"} <= set(os.listdir(new))
+              and (new / "IMG_4471.xmp").read_bytes() == b"<x:xmpmeta>one sidecar for the pair</x:xmpmeta>", os.listdir(new) if new.is_dir() else None)
+        e = (jread(st / "rename-log.json", {}).get("renames") or [{}])[-1]
+        check("the log has the sidecar once, and no problem", [m["from"] for m in e.get("moves", [])].count("Beach_06-04-26/IMG_4471.xmp") == 1 and not e.get("problems"), e.get("problems"))
+
+    print("Their own sidecar, saved again between a cut-off rename and its finish")
+    w, b = world(work, "rename-sidecar", groups=(3, 3), shoots=("Beach", "Palms"))
+    if b:
+        st = b["records"]
+        (w["drive"] / "Beach_06-04-26" / "Beach_0001_IMG_4471.xmp").write_bytes(b"<x:xmpmeta>first</x:xmpmeta>")
+        code, out = t.run("rename_shoot.py", st, "--shoot", "s1", "--name", "Aurora", env=w["env"])
+        # put the rename back to "cut off before this sidecar was checked", then save the sidecar again
+        log = jread(st / "rename-log.json")
+        e = log["renames"][-1]
+        e.pop("finished", None)
+        for m in e["moves"]:
+            m.pop("checked", None)
+        (st / "rename-log.json").write_text(json.dumps(log), encoding="utf-8")
+        xmp = w["drive"] / "Aurora_06-04-26" / "Aurora_0001_IMG_4471.xmp"
+        check("the sidecar travelled with its photo", code == 0 and xmp.is_file(), out)
+        xmp.write_bytes(b"<x:xmpmeta>saved again, longer than before</x:xmpmeta>")
+        code, out = t.run("rename_shoot.py", st, "--shoot", "s2", "--name", "Palms", env=w["env"])
+        e = jread(st / "rename-log.json")["renames"][-1]
+        check("the finish ends clean: their sidecar as they saved it is not a problem", code == 0 and e.get("finished") and not e.get("problems"), out + str(e.get("problems")))
+
+
 def settle_waits(work):
     print("A backup does not settle on top of an unfinished join")
     sys.path.insert(0, str(t.SCRIPTS))
@@ -472,7 +609,7 @@ def second_copy_follows(work):
 
 def main():
     work = Path(tempfile.mkdtemp(prefix="join-shoots-check-"))
-    parts = [plain, refusals, letters, cut_off, unprovable, with_clips, settle_waits, second_copy_follows]
+    parts = [plain, refusals, letters, cut_off, unprovable, with_clips, review_fixes, settle_waits, second_copy_follows]
     only = sys.argv[sys.argv.index("--only") + 1].split(",") if "--only" in sys.argv else None     # e.g. --only refusals,cut_off
     try:
         for part in parts:

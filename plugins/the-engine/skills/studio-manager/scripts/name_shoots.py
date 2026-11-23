@@ -109,7 +109,12 @@ OUR_WORDS = {
     "saving_one": "Renaming {name} now.",
     "saving_mini": "Putting them in one folder.",
     "leave": "You can leave this page. It carries on.",
-    "stopped": "This stopped part way. Nothing is lost. Press Save the names and it will finish.",
+    "stopped": "This stopped before it was done. Nothing is lost. Press Save the names to try again.",
+    "half": "This was cut off part way. Nothing is lost. Press Finish it and it will carry on.",
+    "finish": "Finish it",
+    "finishing": "Finishing what was cut off.",
+    "needs_look": ("This stopped on something I can't sort out from this page. Nothing is lost. "
+                   "Tell the Assistant and it will take a look."),
     "problem": "{line} Nothing is lost.",
     "cant": "That didn't work just now. Tell the Assistant and it'll sort it out.",
     "busy": "A rename or a join is already at work. Give it a moment.",
@@ -235,10 +240,35 @@ function working(){
   const top = $('top'); top.textContent = '';
   const b = el('div', 'work'); b.id = 'work';
   const j = D.job;
-  b.appendChild(el('p', '', j.mini ? W.saving_mini : fill(W.saving, {done: j.done, total: j.total})));
-  if (!j.mini && j.now) b.appendChild(el('p', '', fill(W.saving_one, {name: j.now})));
+  b.appendChild(el('p', '', j.finish ? W.finishing : j.mini ? W.saving_mini : fill(W.saving, {done: j.done, total: j.total})));
+  if (!j.mini && !j.finish && j.now) b.appendChild(el('p', '', fill(W.saving_one, {name: j.now})));
   b.appendChild(el('p', 'dest', W.leave));
   top.appendChild(b);
+}
+function onlyLine(text){
+  head(false);
+  $('sub').textContent = '';
+  const top = $('top'); top.textContent = '';
+  const say = el('p', 'say', text); say.id = 'line'; say.setAttribute('role', 'status'); top.appendChild(say);
+  return top;
+}
+function half(){
+  // a join or a rename was cut off: the only thing offered is finishing it (the names and the tick box would
+  // not be honoured until it is, and the folders the records list are not all there)
+  const top = onlyLine(W.half);
+  const row = el('div', 'row');
+  const b = el('button', 'go', W.finish); b.id = 'finish'; b.type = 'button';
+  b.onclick = async () => {
+    b.disabled = true;
+    try {
+      const r = await fetch('/name-shoots-save', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({backup: BACKUP, names: {}, mini: false, mini_name: ''})});
+      const j = await r.json();
+      if (!j.ok){ $('line').textContent = j.words || W.cant; b.disabled = false; return; }
+      FORM = false; SAY = ''; load();
+    } catch (e) { $('line').textContent = W.cant; b.disabled = false; }
+  };
+  row.appendChild(b); top.appendChild(row);
 }
 function allSet(){
   head(true);
@@ -260,6 +290,8 @@ function draw(){
   clearTimeout(timer);
   const st = D.job ? D.job.state : 'none';
   if (st === 'working'){ working(); timer = setTimeout(load, 1000); return; }
+  if (D.stuck){ onlyLine(W.needs_look); return; }
+  if (D.half){ half(); return; }
   if (st === 'done' && !FORM){ allSet(); return; }
   if ((st === 'problem' || st === 'stopped') && !SAY){
     SAY = D.job.line || W.cant;
@@ -532,7 +564,8 @@ def facts(studio):
     return {"ok": True, "backup": backup_name(studio), "safe": st.get("safe") is True, "safe_line": safe_line,
             "shoots": shoots, "mark": MARK, "space": naming.get("space", " "), "mini_tpl": tpl(first_when),
             "mini_all": WORDS["mini_all"].format(count=clips.words(total_p, total_c)), "note": note,
-            "another": ANOTHER_CARD, "job": job_for_page(studio)}
+            "another": ANOTHER_CARD, "job": job_for_page(studio),
+            "half": half_done(studio) == "half", "stuck": half_done(studio) == "stuck"}
 
 
 def folder_for(naming, name, when):
@@ -579,19 +612,83 @@ def job_write(studio, rec):
     join_shoots.write_json(job_file(studio), rec)
 
 
+_HALF = {}
+
+
+def half_done(studio):
+    """join_shoots.half_done ("half", "stuck" or None), read again only when one of the two logs has changed
+    (the page asks once a second while a job works, and a rename's log of a big shoot is not small)."""
+    studio = Path(studio)
+    stamp = []
+    for name in (join_shoots.LOG, "rename-log.json"):
+        try:
+            st = os.stat(studio / name)
+            stamp.append((st.st_mtime_ns, st.st_size))
+        except OSError:
+            stamp.append(None)
+    had = _HALF.get(str(studio))
+    if had and had[0] == stamp:
+        return had[1]
+    try:
+        out = join_shoots.half_done(studio)
+    except (Exception, SystemExit):  # noqa: BLE001  a log half written this instant: asked again in a second
+        return None
+    _HALF[str(studio)] = (stamp, out)
+    return out
+
+
+_PROBE = threading.Lock()
+
+
+def job_lock_file(tag):
+    return JOBS / f"{tag}.lock"
+
+
+def job_running(tag):
+    """Is this backup's job at work right now? Told by the lock the job holds for as long as it lives (the
+    computer lets go of it the moment the job dies, however it dies), never by its process number: after a
+    power cut and a restart that number belongs to some other program. True, False, or None when this computer
+    has no such locks."""
+    with _PROBE:
+        try:
+            f = open(job_lock_file(tag), "ab")
+        except OSError:
+            return None
+        try:
+            got = this_computer.try_lock(f)
+            if got:
+                this_computer.unlock(f)
+            return None if got is None else not got
+        except OSError:
+            return None
+        finally:
+            f.close()
+
+
 def job_state(studio):
-    """The job's record as it truly stands: "working" only while its process is alive."""
+    """The job's record as it truly stands: "working" only while the job itself is alive."""
     d = job_read(studio)
     if not d:
         return None
     if d.get("state") == "working":
-        alive = this_computer.still_running(d.get("pid")) if d.get("pid") else None
         try:
             young = (datetime.now() - datetime.fromisoformat(d.get("started"))).total_seconds() < STARTING_GRACE
         except (TypeError, ValueError):
             young = False
-        if alive is False or (not d.get("pid") and not young):
-            d = dict(d, state="stopped", line=OUR_WORDS["stopped"])
+        running = job_running(tag_of(studio))
+        if running is None:      # no locks on this computer: the process number is all there is to go by
+            alive = this_computer.still_running(d.get("pid")) if d.get("pid") else None
+            dead = alive is False or (not d.get("pid") and not young)
+        else:                    # a job that has written its number took the lock first: lock free means it is gone
+            dead = not running and (bool(d.get("pid")) or not young)
+        if dead:
+            d = dict(d, state="stopped")
+    if d.get("state") == "stopped":
+        # what to do next is read from the drive's own logs now, never promised from memory: finish it, try
+        # again, or (stopped on a problem, or twice over) tell the Assistant
+        state = half_done(studio)
+        d = dict(d, line=OUR_WORDS["needs_look"] if state == "stuck" else OUR_WORDS["half"] if state == "half"
+                 else OUR_WORDS["stopped"])
     return d
 
 
@@ -601,22 +698,26 @@ def job_for_page(studio):
         return None
     ask = d.get("ask") or {}
     return {"state": d.get("state"), "done": int(d.get("done") or 0), "total": int(d.get("total") or 0),
-            "now": str(d.get("now") or ""), "mini": bool(ask.get("mini")), "line": str(d.get("line") or ""),
+            "now": str(d.get("now") or ""), "mini": bool(ask.get("mini")), "finish": bool(ask.get("finish")),
+            "line": str(d.get("line") or ""),
             "ask": {"names": ask.get("names") or {}, "mini": bool(ask.get("mini")), "mini_name": ask.get("mini_name") or ""}}
 
 
-def start(studio, names, mini=False, mini_name=""):
-    """Start the one background job for this backup. {"ok": True} or {"ok": False, "words": plain words}."""
+def start(studio, names, mini=False, mini_name="", finish=False):
+    """Start the one background job for this backup. {"ok": True} or {"ok": False, "words": plain words}.
+    finish: nothing new, only finish a join or a rename that was cut off (join_shoots.py --finish)."""
     studio = Path(studio)
     now_ = job_state(studio)
-    if now_ and now_.get("state") == "working":
+    if (now_ and now_.get("state") == "working") or job_running(tag_of(studio)):
         return {"ok": False, "words": OUR_WORDS["busy"]}
+    if finish:
+        names, mini, mini_name = {}, False, ""
     todo = [[i, n] for i, n in names.items()]
     rec = {"state": "working", "backup": backup_name(studio), "records": str(studio),
-           "ask": {"names": names, "mini": bool(mini), "mini_name": mini_name},
-           "todo": todo, "done": 0, "total": 1 if mini else len(todo), "now": "", "line": "",
+           "ask": dict({"names": names, "mini": bool(mini), "mini_name": mini_name}, **({"finish": True} if finish else {})),
+           "todo": todo, "done": 0, "total": 1 if mini or finish else len(todo), "now": "", "line": "",
            "started": datetime.now().isoformat(timespec="seconds"), "finished": None, "pid": None}
-    if not mini and not todo:
+    if not mini and not todo and not finish:
         job_write(studio, dict(rec, state="done", finished=rec["started"]))
         return {"ok": True, "state": "done"}
     job_write(studio, rec)
@@ -639,68 +740,93 @@ def plain(out, fallback):
     lines = [ln.strip() for ln in (out or "").strip().splitlines() if ln.strip()]
     stop = next((ln for ln in reversed(lines) if ln.startswith("STOP: ")), "")
     why = stop.replace("STOP: ", "")
-    if not why or "/" in why or "\\" in why:
-        return fallback
+    if not why or "/" in why or "\\" in why or ".json" in why or ".py" in why:
+        return fallback          # a path, or the name of a file of ours, is never put on a photographer's page
     return why
 
 
 def run_job(tag):
-    """The job itself: one shoot at a time, the record written whole after every step."""
+    """The job itself: one shoot at a time, the record written whole after every step. It holds its own lock
+    file for as long as it lives (job_running), and it writes how it ended ONCE, as the last thing it does: until
+    then the record says "working", so a Save pressed while it winds up (the report being built again) is told to
+    wait, never taken and then lost under this job's last write."""
     f = JOBS / f"{tag}.json"
     rec = _json(f)
     if not isinstance(rec, dict) or rec.get("state") != "working":
         return 0
     studio = Path(rec["records"])
+    try:
+        mine = open(job_lock_file(tag), "ab")
+    except OSError:
+        mine = None
+    if mine is not None:
+        end = time.time() + 10
+        while True:
+            got = this_computer.try_lock(mine)      # someone asking "is it at work?" holds it for an instant
+            if got or got is None or time.time() > end:
+                break
+            time.sleep(0.05)
+        if got is False:
+            return 0                                # another job for this backup is alive: this one is not needed
 
     def note(**k):
         rec.update(k)
         join_shoots.write_json(f, rec)
     note(pid=os.getpid())
     quiet = {"creationflags": 0x08000000} if this_computer.WINDOWS else {}
+    end_as = {}
     with join_shoots.held() as got:
         if not got:
             note(state="problem", line=OUR_WORDS["busy"], finished=datetime.now().isoformat(timespec="seconds"))
             return 1
         env = dict(os.environ, **{join_shoots.LOCK_HELD: "1"})
         ask = rec.get("ask") or {}
-        ok = True
-        if ask.get("mini"):
-            name = ask.get("mini_name") or WORDS["mini_default"]
-            note(now=name)
-            r = subprocess.run([sys.executable, str(HERE / "join_shoots.py"), str(studio), "--all", "--name", name],
+
+        def run(script, *args):
+            r = subprocess.run([sys.executable, str(HERE / script), str(studio), *args],
                                capture_output=True, encoding="utf-8", errors="replace", env=env, **quiet)
             sys.stdout.write(r.stdout + r.stderr)
+            sys.stdout.flush()
             if r.returncode == 0:
+                return True
+            # Refused in plain words before anything moved: that line. Anything else stopped part way: what to
+            # do about it (finish it, try again, tell the Assistant) is read from the logs when the page asks.
+            why = plain(r.stdout + r.stderr, "")
+            end_as.update({"state": "problem", "line": OUR_WORDS["problem"].format(line=why)} if why
+                          else {"state": "stopped", "line": ""})
+            return False
+
+        if ask.get("finish"):
+            if run("join_shoots.py", "--finish"):
                 note(done=1)
-            else:
-                ok = False
-                note(state="problem" if r.returncode == 2 else "stopped",
-                     line=(OUR_WORDS["problem"].format(line=plain(r.stdout + r.stderr, OUR_WORDS["cant"])) if r.returncode == 2
-                           else OUR_WORDS["stopped"]))
+        elif ask.get("mini"):
+            name = ask.get("mini_name") or WORDS["mini_default"]
+            note(now=name)
+            if run("join_shoots.py", "--all", "--name", name):
+                note(done=1)
         else:
             for n, (sid, name) in enumerate(rec.get("todo") or []):
                 note(now=name)
-                r = subprocess.run([sys.executable, str(HERE / "rename_shoot.py"), str(studio), "--shoot", sid, "--name", name],
-                                   capture_output=True, encoding="utf-8", errors="replace", env=env, **quiet)
-                sys.stdout.write(r.stdout + r.stderr)
-                if r.returncode != 0:
-                    ok = False
-                    why = plain(r.stdout + r.stderr, "")
-                    note(state="problem" if why else "stopped",
-                         line=OUR_WORDS["problem"].format(line=why) if why else OUR_WORDS["stopped"])
+                if not run("rename_shoot.py", "--shoot", sid, "--name", name):
                     break
                 note(done=n + 1)
-            try:    # the report shows the new names
+        if not ask.get("mini"):
+            try:    # the report shows the new names (a join builds it again itself)
                 subprocess.run([sys.executable, str(HERE / "report_page.py"), str(studio)], capture_output=True,
                                encoding="utf-8", errors="replace", timeout=300, env=env, **quiet)
             except (OSError, subprocess.SubprocessError):
                 pass
-        if ok:
-            note(state="done", now="", finished=datetime.now().isoformat(timespec="seconds"))
-        else:
-            note(finished=datetime.now().isoformat(timespec="seconds"))
+        cut_for_tests("before-last-write")
+        note(**(end_as or {"state": "done", "now": ""}), finished=datetime.now().isoformat(timespec="seconds"))
     sys.stdout.flush()
-    return 0 if ok else 1
+    return 1 if end_as else 0
+
+
+def cut_for_tests(point):
+    """Tests only: hold the job at a named point for a few seconds (STUDIO_NAME_JOB_HOLD_FOR_TESTS=point:seconds)."""
+    want = os.environ.get("STUDIO_NAME_JOB_HOLD_FOR_TESTS") or ""
+    if want.partition(":")[0] == point:
+        time.sleep(float(want.partition(":")[2] or 3))
 
 
 # ---------------------------------------------------------------- the page
@@ -709,7 +835,8 @@ def page_html(backup):
     e = html.escape
     words = {k: W(k) for k in ("title", "title_done", "found", "found_one", "mini", "placeholder", "mini_placeholder",
                                "mini_default", "folder", "save", "later", "another", "another_note", "see_all",
-                               "each_own", "one_folder", "saving", "saving_one", "saving_mini", "leave", "cant", "change")}
+                               "each_own", "one_folder", "saving", "saving_one", "saving_mini", "leave", "cant", "change", "half", "finish", "finishing",
+                               "needs_look")}
     data = lambda o: json.dumps(o, ensure_ascii=False).replace("</", "<\\/")  # noqa: E731
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -873,6 +1000,13 @@ def handle_post(handler, path, query):
             return _answer(handler, {"ok": False, "words": arrange.NOT_UNDERSTOOD}, 400)
         names, mini, mini_name = ask
         with _SAVING:
+            state = half_done(studio)
+            if state == "stuck":
+                return _answer(handler, {"ok": False, "words": OUR_WORDS["needs_look"]})
+            if state == "half":
+                # a join or a rename of this backup was cut off: whatever this page asked for, the one thing
+                # done is finishing it (the page shows only Finish it; a page a step behind may still send names)
+                return _answer(handler, start(studio, {}, finish=True))
             if mini:
                 listed = join_shoots.listing(studio)
                 if len([s for s in listed if s.get("folder")]) < 2:

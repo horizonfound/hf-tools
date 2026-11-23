@@ -59,8 +59,8 @@ def jread(p, default=None):
 
 
 class Server:
-    def __init__(self, w):
-        self.w, self.proc, self.port = w, None, None
+    def __init__(self, w, **extra):
+        self.w, self.proc, self.port, self.extra = w, None, None, extra     # extra: more environment for the server and its jobs
 
     def start(self):
         with socket.socket() as s:
@@ -71,7 +71,7 @@ class Server:
             f.unlink()
         kw = {"creationflags": 0x00000200} if os.name == "nt" else {"start_new_session": True}
         self.proc = subprocess.Popen([sys.executable, str(t.SCRIPTS / "posting_queue.py"), "serve", "--port", str(port0)],
-                                     env=t.child_env(self.w["env"]), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **kw)
+                                     env=t.child_env(dict(self.w["env"], **self.extra)), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **kw)
         end = time.time() + 40
         while time.time() < end and not (f.exists() and f.read_text(encoding="utf-8").strip()):
             time.sleep(0.1)
@@ -320,7 +320,14 @@ def the_routes(work):
         code, d = s.json("GET", "/name-shoots-data" + q)
         job = d.get("job") or {}
         check("a job whose process is gone is said to have stopped, with what to do, never 'working' for ever",
-              job.get("state") == "stopped" and job.get("line") == "This stopped part way. Nothing is lost. Press Save the names and it will finish.", job)
+              job.get("state") == "stopped" and job.get("line") == "This stopped before it was done. Nothing is lost. Press Save the names to try again.", job)
+        # after a power cut and a restart, the dead job's number belongs to some other program that is alive
+        f.write_text(json.dumps(dict(rec, pid=os.getppid() if os.name != "nt" else os.getpid())), encoding="utf-8")
+        code, d = s.json("GET", "/name-shoots-data" + q)
+        check("so is one whose number now belongs to another, living program: told by the job's own lock, never by its number",
+              (d.get("job") or {}).get("state") == "stopped", d.get("job"))
+        code, out = t.run("name_shoots.py", "status", st, env=w["env"])
+        check("and the chat's status says the same", '"state": "stopped"' in out, out)
         rec = dict(rec, pid=None)
         f.write_text(json.dumps(rec), encoding="utf-8")
         code, d = s.json("GET", "/name-shoots-data" + q)
@@ -361,6 +368,135 @@ def the_routes(work):
     finally:
         s.stop()
     return w, b
+
+
+def cut_off_and_stuck(work):
+    import name_shoots
+    HALF = "This was cut off part way. Nothing is lost. Press Finish it and it will carry on."
+    LOOK = "This stopped on something I can't sort out from this page. Nothing is lost. Tell the Assistant and it will take a look."
+    check("a line that names a file of ours never reaches the page", name_shoots.plain("STOP: no shoot s2 in shoots.json.", "fallback") == "fallback"
+          and name_shoots.plain("STOP: a folder named Katie_06-04-26 already exists. Nothing renamed.", "x").startswith("a folder named Katie"))
+
+    def queue_of(w, st):
+        return sorted(x["shoot"] for x in (jread(w["home"] / "queue.json", {}) or {}).get("shoots", [])
+                      if Path(x.get("studio", "")).resolve() == Path(st).resolve())
+
+    print("A mini-sessions join cut off right after its records were written")
+    w, b = world(work, "cut-after")
+    if b:
+        st, name = b["records"], b["session"]
+        q = "?backup=" + quote(name)
+        s = Server(w, STUDIO_JOIN_CUT_FOR_TESTS="after-records")
+        s.start()
+        try:
+            code, d = save(s, name, {}, mini=True, mini_name="Minis")
+            d = wait_job(s, q)
+            job = d.get("job") or {}
+            check("the job is said to have been cut off, with the one thing to press", job.get("state") == "stopped" and job.get("line") == HALF and d.get("half") is True and d.get("stuck") is False, d)
+            s.stop()
+            s = Server(w)
+            s.start()
+            code, d = s.json("GET", "/name-shoots-data" + q)
+            check("after the server starts again the page still knows it is half done", d.get("half") is True and (d.get("job") or {}).get("line") == HALF, d.get("job"))
+            code, d = save(s, name, {})                    # what Finish it sends: no names, no tick
+            check("Finish it is taken as a job, never answered 'done' with nothing run", code == 200 and d == {"ok": True, "state": "working"}, d)
+            d = wait_job(s, q)
+            e = (jread(st / "join-log.json", {}).get("joins") or [{}])[0]
+            check("the job ends done, and the join really is finished in its log", (d.get("job") or {}).get("state") == "done" and e.get("finished") and not e.get("problems")
+                  and d.get("half") is False, {k: v for k, v in e.items() if k != "moves"})
+            check("the editing queue's list (what Your backups draws from) has the one joined shoot", queue_of(w, st) == ["s1"], queue_of(w, st))
+            rep_ = (st / "report.html").read_text(encoding="utf-8")
+            check("the report was built again with the joined shoot", "Minis" in rep_ and "Shoot 2" not in rep_)
+            check("on the drive: the one folder", sorted(x for x in os.listdir(w["drive"] / "CLIENT WORK") if not x.startswith(".")) == ["Minis_06-04-26"])
+        finally:
+            s.stop()
+
+    print("A mini-sessions join cut off before its records were written, then names sent by a page a step behind")
+    w, b = world(work, "cut-before")
+    if b:
+        st, name = b["records"], b["session"]
+        q = "?backup=" + quote(name)
+        s = Server(w, STUDIO_JOIN_CUT_FOR_TESTS="moves:3")
+        s.start()
+        try:
+            save(s, name, {}, mini=True, mini_name="Minis")
+            d = wait_job(s, q)
+            check("cut off part way: half done, nothing else offered", d.get("half") is True and (d.get("job") or {}).get("state") == "stopped", d.get("job"))
+            s.stop()
+            s = Server(w)
+            s.start()
+            code, d = save(s, name, {"s1": "Fam0", "s2": "Fam1", "s3": "Fam2"})
+            d = wait_job(s, q)
+            job = d.get("job") or {}
+            check("names sent while a join is half done only finish the join: no name is given, no line of ours about a file",
+                  job.get("state") == "done" and job.get("finish") is True and [x["folder"] for x in d["shoots"]] == ["Minis_06-04-26"]
+                  and "shoots.json" not in json.dumps(d), d)
+            bad, n = t.photos_match(w["drive"] / "CLIENT WORK", jread(st / "index.json"), b["card"])
+            check(f"every photo is still the card's, byte for byte ({n})", not bad and n == 12, bad)
+        finally:
+            s.stop()
+
+    print("A Save pressed while the job before it is winding up")
+    w, b = world(work, "winding-up")
+    if b:
+        st, name = b["records"], b["session"]
+        q = "?backup=" + quote(name)
+        s = Server(w, STUDIO_NAME_JOB_HOLD_FOR_TESTS="before-last-write:4")
+        s.start()
+        try:
+            save(s, name, {"s1": "Shoot 2", "s2": "Zed"})            # the renamer refuses the first: that folder is there
+            time.sleep(2.0)
+            code, d = s.json("GET", "/name-shoots-data" + q)
+            check("until the job has done its last thing the page says it is working, never its outcome early", (d.get("job") or {}).get("state") == "working", d.get("job"))
+            code, d2 = save(s, name, {"s3": "Katie"})
+            check("a Save pressed meanwhile is told to wait, never taken and then lost",
+                  d2.get("ok") is False and d2.get("words") == "A rename or a join is already at work. Give it a moment.", d2)
+            d = wait_job(s, q)
+            job = d.get("job") or {}
+            check("then the outcome, in plain words", job.get("state") == "problem" and "already exists" in job.get("line", "") and job.get("line", "").endswith("Nothing is lost."), job)
+            s.stop()
+            s = Server(w)
+            s.start()
+            code, d2 = save(s, name, {"s3": "Katie"})
+            d = wait_job(s, q)
+            check("and the next Save is taken and done", d2.get("ok") is True and (d.get("job") or {}).get("state") == "done"
+                  and (w["drive"] / "CLIENT WORK" / "Katie_06-04-26").is_dir(), d.get("job"))
+        finally:
+            s.stop()
+
+    print("A rename that can't be finished by pressing again")
+    w, b = world(work, "stuck")
+    if b:
+        st, name = b["records"], b["session"]
+        q = "?backup=" + quote(name)
+        gone = w["drive"] / "CLIENT WORK" / "Shoot 3_06-04-26" / "Shoot_0002_IMG_4481.JPG"
+        check("a photo of the third shoot is there to be moved out by hand", gone.is_file(), sorted(os.listdir(gone.parent)))
+        away = w["drive"] / "stray.JPG"
+        os.rename(gone, away)
+        s = Server(w)
+        s.start()
+        try:
+            save(s, name, {"s1": "Aurora", "s3": "Katie"})
+            d = wait_job(s, q)
+            job = d.get("job") or {}
+            check("the first Save gives the true line, and the page offers Finish it", job.get("state") == "problem" and "stopped part way on something unexpected" in job.get("line", "")
+                  and d.get("half") is True, d.get("job"))
+            save(s, name, {})
+            d = wait_job(s, q)
+            job = d.get("job") or {}
+            check("when finishing it fails too, the page no longer promises that pressing again will finish it: tell the Assistant",
+                  job.get("state") == "stopped" and job.get("line") == LOOK and d.get("stuck") is True and d.get("half") is False, d.get("job"))
+            code, d2 = save(s, name, {"s2": "Hannah"})
+            check("and another press is answered with the same line, nothing started", d2.get("ok") is False and d2.get("words") == LOOK, d2)
+            check("no path and no file name of ours anywhere in what the page gets", no_path(w, d) and ".json" not in json.dumps(d))
+            # the photo is put back where the log left it; the chat's finish command mends it
+            os.rename(away, w["drive"] / "CLIENT WORK" / "Katie_06-04-26" / "Shoot_0002_IMG_4481.JPG")
+            code, out = t.run("join_shoots.py", st, "--finish", env=w["env"])
+            code2, d = s.json("GET", "/name-shoots-data" + q)
+            check("once the Assistant has finished it from the chat the page is itself again", code == 0 and d.get("stuck") is False and d.get("half") is False
+                  and [x["folder"] for x in d["shoots"]] == ["Aurora_06-04-26", "Shoot 2_06-04-26", "Katie_06-04-26"], out + str(d.get("shoots")))
+        finally:
+            s.stop()
 
 
 def the_report(work):
@@ -487,6 +623,35 @@ def the_page(work, shot=None):
             check("nothing on the page scrolls sideways at this width", c.js("document.documentElement.scrollWidth <= window.innerWidth"))
             got = sorted(os.listdir(w["drive"] / "CLIENT WORK" / "Fall minis_06-04-26"))
             check("and on the drive the twelve photos are in it, in order", got == [f"Fall_{n:04d}_IMG_{4470 + n}.JPG" for n in range(1, 13)], got)
+
+            print("The page when a join was cut off")
+            w2, b2 = world(work, "chrome-half")
+            if b2:
+                s.stop()
+                s = Server(w2)
+                s.start()
+                code, out = t.run("join_shoots.py", b2["records"], "--all", "--name", "Minis", env=dict(w2["env"], STUDIO_JOIN_CUT_FOR_TESTS="moves:3"))
+                c.open(s.url("/name-shoots.html?backup=" + quote(b2["session"])))
+                c.wait_for("document.getElementById('finish') !== null", 15)
+                check("only the line and one button, Finish it, right under it: no name boxes, no tick box, no Save",
+                      code == 70 and c.js("document.getElementById('line').textContent") == "This was cut off part way. Nothing is lost. Press Finish it and it will carry on."
+                      and c.js("document.getElementById('finish').textContent") == "Finish it"
+                      and c.js("document.querySelectorAll('.nshoot, #mini, #save').length") == 0, c.js("document.getElementById('top').textContent"))
+                c.click("#finish")
+                c.wait_for("document.getElementById('named') !== null", 60)
+                check("Finish it finishes the join: All set, the one folder",
+                      c.js("[...document.querySelectorAll('#named p')].map(p => p.textContent)") == ["Minis_06-04-26"],
+                      c.js("document.getElementById('top').textContent"))
+                # a join that has stopped on a problem (written by hand here): pressing again is not the answer
+                jl = b2["records"] / "join-log.json"
+                log = jread(jl)
+                log["joins"].append({"ids": ["s8", "s9"], "name": "X", "moves": [], "problems": ["pretend"], "started": "x"})
+                jl.write_text(json.dumps(log), encoding="utf-8")
+                c.reload()
+                c.wait_for("document.getElementById('line') !== null", 15)
+                check("stopped on a problem: one line that says to tell the Assistant, and nothing to press",
+                      c.js("document.getElementById('line').textContent") == "This stopped on something I can't sort out from this page. Nothing is lost. Tell the Assistant and it will take a look."
+                      and c.js("document.querySelectorAll('#finish, #save, .nshoot, #named').length") == 0, c.js("document.getElementById('top').textContent"))
     finally:
         s.stop()
         chrome_drive.stop_all()
@@ -500,6 +665,7 @@ def main():
         the_words()
         the_instructions()
         the_routes(work)
+        cut_off_and_stuck(work)
         the_report(work)
         if chrome:
             the_page(work, shot)

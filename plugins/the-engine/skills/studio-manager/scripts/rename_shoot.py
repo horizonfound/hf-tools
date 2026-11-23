@@ -149,6 +149,7 @@ def plan_rename(session, studio, shoot_id, new_name):
         return listings[folder]
 
     moves = []
+    planned_sidecars = set()   # one sidecar is planned once, however many photos share its stem (a RAW and its JPEG)
     for p in in_folder:
         cur = Path(p["file"])
         into = new_folder / inside(cur).parent   # the same place inside the shoot (Photos, Videos, or the top)
@@ -172,6 +173,9 @@ def plan_rename(session, studio, shoot_id, new_name):
             sc = cur.with_suffix(ext)
             so = Path(p["original"]).with_suffix(ext).as_posix()
             if so in files and (session / sc).exists():
+                if sc.as_posix().lower() in planned_sidecars:
+                    break
+                planned_sidecars.add(sc.as_posix().lower())
                 if not files[so].get("sha256"):
                     sys.exit(f"STOP: no verified record for {so}. Nothing renamed.")
                 moves.append({"from": sc.as_posix(), "to": (into / sidecar_name(ext)).as_posix(),
@@ -186,7 +190,8 @@ def plan_rename(session, studio, shoot_id, new_name):
             found = names_in(cur.parent).get((cur.stem + ".xmp").lower())
             if found:
                 sc = cur.parent / found
-                if (session / sc).is_file():
+                if (session / sc).is_file() and sc.as_posix().lower() not in planned_sidecars:
+                    planned_sidecars.add(sc.as_posix().lower())
                     ours = studio_wrote(session / sc)
                     moves.append({"from": sc.as_posix(), "to": (into / sidecar_name(Path(found).suffix)).as_posix(),
                                   "original": None, "sha256": sha256_of(session / sc), **({"studio": True} if ours else {"theirs": True})})
@@ -297,8 +302,10 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
                 entry["problems"].append(f"no hash to check against: {m['to']}")
                 continue
             if sha256_of(dst) != m["sha256"]:
-                entry["problems"].append(f"hash mismatch after the rename: {m['to']}")
-                continue
+                if not (m.get("theirs") and dst.is_file()):
+                    entry["problems"].append(f"hash mismatch after the rename: {m['to']}")
+                    continue
+                m["saved_again"] = True   # their own sidecar, saved again by their editing program meanwhile: theirs
             hashed += 1
         entry["verified"] += 1
     entry["hashed_in_full"] = hashed
@@ -519,6 +526,12 @@ def finish_unfinished(session, studio):
                 if m.get("sha256") and sha256_of(dst) == m["sha256"]:
                     entry["verified"] += 1
                     m["checked"] = True
+                elif m.get("theirs") and dst.is_file():
+                    # their own sidecar (never the backup's): its hash was taken at the plan only to prove the
+                    # move, and their editing program saved it again before this run finished the rename. It is
+                    # beside its photo under its new name; what it holds is theirs. Noted, never a problem.
+                    entry["verified"] += 1
+                    m["checked"] = m["saved_again"] = True
                 else:
                     entry["problems"].append(f"could not verify {m['to']}")
             elif on_disk(src) and on_disk(dst):
@@ -530,6 +543,11 @@ def finish_unfinished(session, studio):
         checked = {m["to"] for m in real if m.get("checked")}
         tail = " already exists; not overwritten"
         entry["problems"] = [q for q in entry["problems"] if not (q.endswith(tail) and q[:-len(tail)] in checked)]
+        # what an earlier try at finishing could not do, and this one did: a file that was missing then and is now
+        # under its new name and matches its hash is no longer a problem (only with that proof, as above)
+        mended = ({f"missing: {m['from']}" for m in real if m.get("checked")} | {f"never moved: {m['from']}" for m in real if m.get("checked")}
+                  | {f"could not verify {m['to']}" for m in real if m.get("checked")})
+        entry["problems"] = [q for q in entry["problems"] if q not in mended]
         log_path.write_text(json.dumps(log, indent=1), encoding="utf-8")
         if new_folder:
             write_records(session, studio, entry["shoot"], new_folder, real, entry["to_name"])

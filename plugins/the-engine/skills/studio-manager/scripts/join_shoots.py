@@ -65,6 +65,7 @@ LOG = "join-log.json"
 STAGING_TAIL = " (joining)"      # the folder the joined shoot is gathered in until it can take its name
 ASIDE = "from-joined"            # in the records: the computer's own hidden notes found in an emptied shoot folder
 MINI_NAME = "Mini sessions"      # her mock-up's name for a joined card nobody named
+STUCK_AFTER = 2                  # a join or rename that has stopped this many times is not "run it again": the Assistant looks
 REFUSE_IF_IN_USE = True          # a shoot with a due date, delivered, or with a post kit made from it is not joined
 HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 LOCK = HOME / "shoot-files.lock"  # one join (or one Name your shoots job) at a time on this computer
@@ -513,7 +514,7 @@ def update_queue(session, studio, entry):
         pass
 
 
-def after(session, studio):
+def after(session, studio, second=True):
     """The report shows the joined shoot, and a second copy on another drive is brought in line (lane B)."""
     try:
         subprocess.run([sys.executable, str(HERE / "report_page.py"), str(studio)],
@@ -521,7 +522,8 @@ def after(session, studio):
                        **({"creationflags": 0x08000000} if this_computer.WINDOWS else {}))
     except (OSError, subprocess.SubprocessError):
         pass
-    follow_second(studio)
+    if second:
+        follow_second(studio)
 
 
 def follow_second(studio):
@@ -561,10 +563,16 @@ def take_down(session, studio, entry):
             if entries and all(x.is_file() and this_computer.housekeeping_file(x.name) for x in entries):
                 for x in entries:
                     dst = studio / ASIDE / x.relative_to(session)
-                    if not dst.exists():
-                        dst.parent.mkdir(parents=True, exist_ok=True)
-                        this_computer.rename(x, dst)
-                        entry.setdefault("aside", []).append(x.relative_to(session).as_posix())
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    k = 1
+                    while named_like(dst.parent, dst.name):
+                        # an earlier join set a note of this name aside from a folder of this name (the Mac
+                        # writes a new one whenever they open the folder): that one is kept, and this one goes
+                        # beside it under the next free name. Never written over, never left in the way.
+                        k += 1
+                        dst = dst.with_name(f"{x.name} ({k})")
+                    this_computer.rename(x, dst)
+                    entry.setdefault("aside", []).append(x.relative_to(session).as_posix())
             try:
                 this_computer.rmdir(d)
             except this_computer.HeldOpen:
@@ -678,6 +686,14 @@ def carry_out(session, studio, log, log_path, entry, deep=False):
             entry["problems"].append(f"after the join, {m['to']} is not there")
             continue
         same, read = proved(dst, m, deep=deep)
+        if not same and m.get("kind") == "sidecar" and not m.get("original") and dst.is_file():
+            # Their own sidecar (not one the backup copied): its hash was only taken at the plan to prove the
+            # move, and their editing program may save it again at any moment (a join cut off, an edit, then
+            # the finish). It is under exactly its new name beside its photo, so it is where it belongs; what it
+            # holds now is theirs. Noted in the log, never a problem.
+            if not m.get("saved_again"):
+                m["saved_again"] = now()
+            same, read = True, False
         if not same:
             entry["problems"].append(f"not the same file after the join: {m['to']}" if m.get("sha256")
                                      else f"no hash to check against: {m['to']}")
@@ -693,15 +709,48 @@ def carry_out(session, studio, log, log_path, entry, deep=False):
     entry["finished"] = now()
     write_json(log_path, log)
     say(f"  {checked} of {len(moves)} files checked" + (f" ({hashed} read in full)" if hashed else ""))
+    again = sum(1 for m in moves if m.get("saved_again"))
+    if again:
+        say(f"  ({again} sidecar{'s were' if again != 1 else ' was'} saved again by an editing program since the plan; "
+            f"{'each is' if again != 1 else 'it is'} beside its photo under its new name)")
+    # The files are where the records now say, problem or not, so everything that shows the shoots follows them:
+    # the editing queue's list and the report. (Before, a problem at the check left both showing the joined-away
+    # shoots, with folders that were gone, for good.)
+    update_queue(session, studio, entry)
     if entry["problems"]:
+        after(session, studio, second=False)   # the second copy is not brought in line with a join that has a problem
         say(f"  PROBLEMS (every move is in {LOG}):")
         for p in entry["problems"][:10]:
             say(f"    - {p}")
         sys.exit(1)
-    update_queue(session, studio, entry)
     for folder in entry.get("left") or []:
         say("  " + WORDS["left"].format(folder=folder))
     after(session, studio)
+    return True
+
+
+def look_again(session, studio, log, log_path, entry):
+    """A join that ended with a problem at its check: look at its files once more, changing nothing. Only when
+    every file is under exactly its joined name and proved the same file is the problem cleared and the join's
+    last steps (the second copy) done. Otherwise everything is left exactly as it is: no record is written from
+    this entry (a later rename may have moved the shoot on since), and the problem stays on record."""
+    session = Path(session)
+    for m in entry.get("moves", []):
+        dst = session / m["to"]
+        if not on_disk(dst):
+            return False
+        same, _ = proved(dst, m)
+        if not same and not (m.get("kind") == "sidecar" and not m.get("original") and dst.is_file()):
+            return False
+    for m in entry["moves"]:
+        m["checked"] = True
+    entry["problems_were"], entry["problems"] = entry.get("problems"), []
+    entry["verified"], entry["looked_again"] = len(entry["moves"]), now()
+    write_json(log_path, log)
+    say(f"A join that ended with a problem checks out now: {entry.get('name')}")
+    update_queue(session, Path(studio), entry)
+    after(session, Path(studio))
+    return True
 
 
 def finish_unfinished(session, studio):
@@ -713,12 +762,46 @@ def finish_unfinished(session, studio):
         return False
     did = False
     for entry in log.get("joins", []):
+        if entry.get("finished") and not entry.get("problems"):
+            continue
         if entry.get("finished"):
+            # It ended with a problem at its check. Looked at again on every later run: when the check now
+            # passes (a drive that misread once, a file put back) the problem is cleared and the join's last
+            # steps are done; when it does not, the problem stays on record (so nothing settles) and this run
+            # carries on with what it was asked, since every file is where the records say.
+            if look_again(session, studio, log, log_path, entry):
+                did = True
             continue
         say(f"Finishing a join that was cut off: {entry.get('name')}")
         carry_out(session, studio, log, log_path, entry)
         did = True
     return did
+
+
+def half_done(studio):
+    """What the next run would have to finish before anything new, for the Name your shoots page:
+    "half" (a join or a rename was cut off and the next run finishes it), "stuck" (it has stopped on a problem,
+    or twice over, so running it again is not the answer: the Assistant has to look), or None."""
+    studio = Path(studio)
+    out = None
+    for e in (read_json(studio / LOG, {}) or {}).get("joins", []):
+        if not isinstance(e, dict) or e.get("finished"):
+            continue                                   # finished with a problem does not stand in a later run's way
+        if e.get("problems") or len(e.get("stops") or []) >= STUCK_AFTER:
+            return "stuck"
+        out = "half"
+    for e in (read_json(studio / "rename-log.json", {}) or {}).get("renames", []):
+        if not isinstance(e, dict):
+            continue
+        tos = [str(m.get("to", "")).lower() for m in e.get("moves", [])]
+        real = [m for m in e.get("moves", [])     # a move an old version planned twice for one sidecar is no move
+                if not m.get("phantom") and not (not m.get("sha256") and tos.count(str(m.get("to", "")).lower()) > 1)]
+        if e.get("finished") and all(m.get("moved") for m in real):
+            continue
+        if e.get("problems") or len(e.get("stops") or []) >= STUCK_AFTER:
+            return "stuck"
+        out = "half"
+    return out
 
 
 def unfinished(studio):
@@ -814,8 +897,10 @@ def main():
             sys.exit(2)
         if a.finish:
             rename_shoot.finish_unfinished(session, studio)
-            if not finish_unfinished(session, studio):
+            if not finish_unfinished(session, studio) and not unfinished(studio):
                 say("No join is waiting to be finished.")
+            if unfinished(studio):
+                sys.exit(1)                  # one that ended with a problem is still on record
             return
         ids = a.shoots or []
         if a.all:
