@@ -1166,6 +1166,26 @@ def build(manifest, studio, card=None):
     return "\n".join(out)
 
 
+def put_whole(page, text):
+    """A report page put in place whole: written beside itself under a scratch name of our own, then given its
+    name in one step. Written straight over itself (as it was until Nov 23) there was an instant in which the
+    page was empty or half there, and a look in that instant (the open report reloading itself after a rename,
+    the report's server, a check on GitHub's PC) got a blank page that never reloads. If the computer won't let
+    the new one take the name (a PC, with the page held open for longer than a moment), it is written the old
+    way, so the report is never left out of date."""
+    page = Path(page)
+    tmp = page.with_name(f".{page.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        this_computer.replace(tmp, page)
+    except OSError:
+        try:
+            tmp.unlink()            # our own scratch copy, never the report
+        except OSError:
+            pass
+        page.write_text(text, encoding="utf-8")
+
+
 def write_page(session_dir):
     """The report, report.html in the records. A backup that is one card of a shoot (shoot_report.py: shoot.json in
     the records) also gets report-card.html, the same report as a card, and the shoot's own page is rebuilt for
@@ -1175,11 +1195,11 @@ def write_page(session_dir):
     _, studio = locate(session_dir)
     manifest = json.loads((studio / "manifest.json").read_text(encoding="utf-8"))
     page = studio / "report.html"
-    page.write_text(build(manifest, studio), encoding="utf-8")
+    put_whole(page, build(manifest, studio))
     import shoot_report
     card = shoot_report.card_of(studio)
     if card:
-        (studio / "report-card.html").write_text(build(manifest, studio, card=card), encoding="utf-8")
+        put_whole(studio / "report-card.html", build(manifest, studio, card=card))
         shoot_report.write_pages(studio)
     return page
 
