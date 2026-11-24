@@ -327,6 +327,34 @@ def next_drive(w, b, base):
     check("through all of it, no photo moved", photos_on(w["drive"]) == drive0 and tree(b["records"]) == rec0)
 
 
+WHOLE_REPORT = r"""
+import json, os, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import report_page, this_computer
+studio = Path(sys.argv[2])
+page = studio / "report.html"
+whole = lambda p: (lambda x: x.lstrip().lower().startswith("<!doctype") and x.rstrip().endswith("</html>") and "class='shoot'" in x)(Path(p).read_text(encoding="utf-8"))
+seen = {"swaps": 0, "straight": []}
+real_replace, real_write = this_computer.replace, Path.write_text
+def swap(src, dst, *a, **k):
+    if Path(dst).name == "report.html":
+        seen["swaps"] += 1
+        seen["old_whole"], seen["new_whole"] = whole(dst), whole(src)
+    return real_replace(src, dst, *a, **k)
+def write(self, *a, **k):
+    if self.name in ("report.html", "report-card.html"):
+        seen["straight"].append(self.name)
+    return real_write(self, *a, **k)
+this_computer.replace = swap
+Path.write_text = write
+report_page.write_page(studio)
+seen["after_whole"] = whole(page)
+seen["left"] = sorted(n for n in os.listdir(studio) if n.endswith(".tmp"))
+print(json.dumps(seen))
+"""
+
+
 def naming(w, b, base):
     print("Change how my shoots are named")
     j = jget(base, "/naming")
@@ -373,6 +401,20 @@ def naming(w, b, base):
     check("each shoot's own line says it was renamed", all(status.get(s, {}).get("line") == "Done. Folder and photos renamed." for s in ("s1", "s2")), str(status))
     page = (b["records"] / "report.html").read_text(encoding="utf-8")
     check("the report was rebuilt with nothing lost: both shoots, their names, the options", page.count("<article class='shoot'>") == 2 and "id='opt-naming'" in page)
+    # The report is put in place whole (Nov 23). Until then it was written straight over itself, so for an instant
+    # it was empty or half there; GitHub's PC read it in that instant once (the check above failed), and an open
+    # report reloading itself could have got a blank page. Here: at the moment the new report takes its name, the
+    # report on disk is still the whole old one, and the new one is whole beside it.
+    code, out = t.run_python(["-c", WHOLE_REPORT, str(t.SCRIPTS), str(b["records"])], env=w["env"])
+    try:
+        seen = json.loads(out.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        seen = {"error": out[-600:]}
+    check("a rebuilt report takes its place whole: the old one is whole until the swap, the new one whole before it, no scratch file left",
+          seen.get("swaps") == 1 and seen.get("old_whole") is True and seen.get("new_whole") is True and seen.get("left") == []
+          and seen.get("after_whole") is True, str(seen))
+    check("no report page is ever opened to be written over while it is the report (only our scratch file is written)",
+          seen.get("straight") == [], str(seen))
     # pressed again: nothing to do
     drive1, n_log = photos_on(w["drive"]), len(log)
     code, j = jpost(base, "/naming", {"offered": 2, "apply": True})

@@ -102,14 +102,24 @@ def main():
              "pvPcNote" not in pc[kind] and "pvSaveVid" not in pc[kind] and "class='btn main' id='pvMake'" in pc[kind])
         case("a PC and a Mac: the %s reel's watch step is the same" % kind, pc[kind] == mac[kind])
 
-    # --- a Mac: as it was
-    case("a Mac (no switch): finished videos can be made", mac["pc"] is False)
-    case("a Mac: the chooser has no PC line", "class='pcnote'" not in mac["chooser"] and "kBrollPc" not in mac["chooser"] and mac["card"] not in mac["chooser"])
-    m = mac["broll"]
-    case("a Mac: her sentence, whole (Save my video, no CapCut needed)", "<p class='say' id='pvSayBroll'>" + mac["hers"] + "</p>" in m and "pvPcNote" not in m)
-    sv, mk = button(m, "pvSaveVid"), button(m, "pvMake")
-    case("a Mac: Save my video is the main button and shown; Make this one in CapCut the plain one",
-         sv == "<button class='btn main' id='pvSaveVid' type='button'>" and mk == "<button class='btn' id='pvMake' type='button'>", (sv, mk))
+    # --- a Mac: as it was. Only a Mac can be a Mac: with the switch off, a real PC is still a computer with no
+    # finished video, so there the four Mac cases cannot exist. On a PC we check instead that the real thing (no
+    # switch) gives the very pages the switch gave above, so everything checked above holds for a real PC too.
+    import platform
+    if platform.system() != "Darwin":
+        print("SKIP  the four 'a Mac' cases: this computer is not a Mac (they run on a Mac)")
+        case("a real PC (no switch) is a computer with no finished video", mac["pc"] is True)
+        case("a real PC (no switch): the chooser and the three watch steps are exactly what the switch gives",
+             all(mac[k] == pc[k] for k in ("chooser", "broll", "photos", "bts")), [k for k in ("chooser", "broll", "photos", "bts") if mac[k] != pc[k]])
+    else:
+        case("a Mac (no switch): finished videos can be made", mac["pc"] is False)
+        case("a Mac: the chooser has no PC line", "class='pcnote'" not in mac["chooser"] and "kBrollPc" not in mac["chooser"] and mac["card"] not in mac["chooser"])
+        m = mac["broll"]
+        case("a Mac: her sentence, whole (Save my video, no CapCut needed)", "<p class='say' id='pvSayBroll'>" + mac["hers"] + "</p>" in m and "pvPcNote" not in m)
+        sv, mk = button(m, "pvSaveVid"), button(m, "pvMake")
+        case("a Mac: Save my video is the main button and shown; Make this one in CapCut the plain one",
+             sv == "<button class='btn main' id='pvSaveVid' type='button'>" and mk == "<button class='btn' id='pvMake' type='button'>", (sv, mk))
+
 
     # --- the instructions say the same gap
     part = (PARTS / "on-a-pc.md").read_text(encoding="utf-8")

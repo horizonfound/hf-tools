@@ -109,12 +109,25 @@ def now():
     return datetime.now().isoformat(timespec="seconds")
 
 
+READ_TRIES = 12                        # ours: looks at a record a PC won't open this instant, about half a second in all
+
+
 def read():
-    try:
-        got = json.loads(JOB.read_text(encoding="utf-8"))
-        return got if isinstance(got, dict) else None
-    except (OSError, ValueError):
-        return None
+    """The job's record, or None when there is none (or it can't be read). On a PC a record can't be opened in
+    the instant another process is putting a newer one in its place (write_whole waits the same way on its side):
+    that is asked again for about half a second before it is believed, so a job that is running is never told
+    as "nothing running" for one look of the page (found on GitHub's PC, Nov 23)."""
+    for i in range(READ_TRIES):
+        try:
+            got = json.loads(JOB.read_text(encoding="utf-8"))
+            return got if isinstance(got, dict) else None
+        except PermissionError:
+            if i == READ_TRIES - 1:
+                return None
+            time.sleep(0.01 * (i + 1))
+        except (OSError, ValueError):
+            return None
+    return None
 
 
 def write(rec):

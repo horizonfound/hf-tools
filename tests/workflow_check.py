@@ -89,8 +89,12 @@ def main():
         check("the workflow file parses as YAML (read with %s)" % how.split(":")[0], isinstance(doc, dict), how)
     if isinstance(doc, dict):
         jobs = doc.get("jobs") if isinstance(doc.get("jobs"), dict) else {}
-        check("it has its five jobs: windows, windows-page, mac, mac-talking, mac-page",
-              sorted(jobs) == ["mac", "mac-page", "mac-talking", "windows", "windows-page"], sorted(jobs))
+        # mac-page became four jobs on Nov 23: as one it ran past its 50 minutes on GitHub's Mac and was cut off
+        check("it has its eight jobs: windows, windows-page, mac, mac-talking, and the four page jobs on the Mac",
+              sorted(jobs) == ["mac", "mac-page", "mac-page-design", "mac-page-reel", "mac-page-vault", "mac-talking", "windows", "windows-page"], sorted(jobs))
+        check("every page job on the Mac may fail without failing the check, and has a time limit of its own",
+              all(isinstance(jobs.get(j), dict) and jobs[j].get("continue-on-error") is True and isinstance(jobs[j].get("timeout-minutes"), int)
+                  for j in ("mac-page", "mac-page-design", "mac-page-reel", "mac-page-vault")))
         # YAML reads a bare `on` as the boolean true (ruby's JSON then spells it "true"); GitHub reads it as the word
         on = next((doc[k] for k in ("on", True, "true") if isinstance(doc.get(k), dict)), {})
         push_paths = (on.get("push") or {}).get("paths") if isinstance(on.get("push"), dict) else None

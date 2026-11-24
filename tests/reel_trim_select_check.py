@@ -318,8 +318,28 @@ def run_select(c, s):
 
     # the bar's buttons: one save and one Undo each
     c.js("document.getElementById('reelwrap').scrollIntoView({block: 'center'})")
-    c.click(tile(2))
-    c.click(tile(4), shift=True)
+    # A press is aimed at where a photo was measured. On a slow Mac (GitHub's, Nov 23) the page was still moving
+    # under that aim right after the scroll, the two presses did not land on photos 2 and 4, and no bar came up.
+    # A person presses what they see: wait until the page is still, press, and look that 2 to 4 are selected; if
+    # they are not, let go (Escape) and press once more, saying so here. What the bar then does is checked as ever.
+    for again in (False, True):
+        y, still, end = c.js("window.scrollY"), time.time(), time.time() + 15
+        while time.time() - still < 0.5 and time.time() < end:
+            time.sleep(0.05)
+            now = c.js("window.scrollY")
+            if now != y:
+                y, still = now, time.time()
+        c.click(tile(2))
+        c.click(tile(4), shift=True)
+        try:
+            c.wait_for("JSON.stringify(%s) === '[2,3,4]'" % PICKED, 3)
+            break
+        except chrome_drive.Timeout:
+            if again:
+                break
+            print("NOTE  the presses on photos 2 and 4 did not land (the page was still moving): pressed once more", flush=True)
+            c.key("Escape")
+    case("photos 2 to 4 are selected for the bar's buttons", c.js(PICKED) == [2, 3, 4], c.js(PICKED))
     rev0 = rec(s, kit)["rev"]
     c.click("#reelSel button[data-s='long']")
     case("Longer marks every selected photo, and they stay selected", c.js(MARKS) == ",+,+,+,,,," and c.js(PICKED) == [2, 3, 4], c.js(MARKS))

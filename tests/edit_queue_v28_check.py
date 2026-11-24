@@ -235,6 +235,10 @@ def check_page(c, s):
     case("queue.json is byte for byte what it was", (s.home / "queue.json").read_bytes() == before)
     case("the shoot is still waiting in the record", s.shoot("Lee family")["status"] == "waiting" and "finished_at" not in s.shoot("Lee family"))
     c.wait_for("document.querySelectorAll('.confetti').length == 0", 6)
+    # the real queue is dealt in again after the preview, so the card is still rising for half a second: the test's
+    # press is aimed at where the button was measured, and on a slow Mac (GitHub's) the card had moved on by the time
+    # the press landed. Wait until the deal is over, then press.
+    c.wait_for("Array.from(document.querySelectorAll('#list .card')).every(e => getComputedStyle(e).opacity === '1' && e.getAnimations().every(a => a.playState === 'finished'))", 8)
     c.click(card(s, "Lee family") + " .setdue")
     case("after the preview the card works as ever (Change the date opens)", c.wait_for("!!document.querySelector('#list .card input[type=date]')", 5))
     case("nothing went wrong on the page", c.page_errors() == [], c.page_errors())

@@ -735,6 +735,13 @@ def job_state(studio):
         else:                    # a job that has written its number took the lock first: lock free means it is gone
             dead = not running and (bool(d.get("pid")) or not young)
         if dead:
+            # The record and "is it still running?" are two looks, and a job that ended between them had its
+            # lock free while the record in hand still said working: it was told as cut off ("Press Finish it")
+            # though it had just finished (GitHub's Mac, Nov 23; the same fault mended in the reel and talking
+            # jobs on Nov 17). So the record is read again, and only one that STILL says working is a stop.
+            again = job_read(studio)
+            if again and again.get("state") != "working":
+                return job_state(studio)
             d = dict(d, state="stopped")
     if d.get("state") == "stopped":
         # what to do next is read from the drive's own logs now, never promised from memory: finish it, try

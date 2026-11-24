@@ -348,6 +348,53 @@ def unit_checks(work):
           and backup_job.no_path("Cannot write to /Volumes/Other/x", {}) is None
           and backup_job.no_path("see C:\\Users\\me\\x", {}) is None and backup_job.no_path("look in _studio/report.html", {}) is None)
 
+    record_read_checks(work)
+
+
+RECORD_READ = r"""
+import json, sys, time
+sys.path.insert(0, sys.argv[1])
+import backup_job as J
+from pathlib import Path
+J.write(J.blank(state="running", card="EOS_DIGITAL"))
+real = Path.read_text
+left = {"n": int(sys.argv[2])}
+def held(self, *a, **k):
+    if self == J.JOB and left["n"] > 0:
+        left["n"] -= 1
+        raise PermissionError(13, "The process cannot access the file because it is being used by another process")
+    return real(self, *a, **k)
+Path.read_text = held
+t0 = time.time()
+got = J.read()
+print(json.dumps({"state": (got or {}).get("state"), "card": (got or {}).get("card"), "took": round(time.time() - t0, 2), "left": left["n"]}))
+"""
+
+
+def record_read_checks(work):
+    """A PC won't open the job's record in the instant a newer one is being put in its place. Before Nov 23 that
+    one look read as "no job at all" (state idle), and GitHub's PC caught it: a job just started was told as
+    nothing running. Played here on either computer by refusing the first reads the way a PC does."""
+    print("The job's record, read in the instant it is being saved (a PC refuses the open for a moment)")
+    home = work / "record-read"
+    home.mkdir(parents=True, exist_ok=True)
+    env = dict(os.environ, STUDIO_HOME=str(home), PYTHONIOENCODING="utf-8")
+
+    def ask(refusals):
+        r = subprocess.run([sys.executable, "-c", RECORD_READ, str(t.SCRIPTS), str(refusals)], env=env, capture_output=True, text=True, timeout=60)
+        try:
+            return json.loads(r.stdout.strip().splitlines()[-1])
+        except (ValueError, IndexError):
+            return {"error": (r.stdout + r.stderr)[-600:]}
+    got = ask(3)
+    check("refused three times and then let in: the record is read (running, the card), never taken for no job",
+          got.get("state") == "running" and got.get("card") == "EOS_DIGITAL" and got.get("left") == 0, str(got))
+    got = ask(10 ** 6)
+    check("refused for good: no record (as before), after about half a second, never a wait without end",
+          got.get("state") is None and "error" not in got and 0.2 <= got.get("took", 99) < 5, str(got))
+    got = ask(0)
+    check("never refused (a Mac, and a PC nearly always): read at once", got.get("state") == "running" and got.get("took", 99) < 0.2, str(got))
+
 
 def instructions_checks():
     part = (t.SCRIPTS.parent / "parts" / "backup.md").read_text(encoding="utf-8")
