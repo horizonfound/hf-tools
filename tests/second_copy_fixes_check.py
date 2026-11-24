@@ -81,7 +81,20 @@ def snap(b, tag):
 
 
 def restore(b, tag):
-    shutil.rmtree(b["base"])
+    # A catch-up the part before started by itself (the report's own status check starts one in the background)
+    # may be on its way out with its log still open; a PC won't take a file away while a program has it open.
+    # That is this test clearing its own pretend world, nothing a photographer does: wait for the hold to go.
+    end = time.time() + 60
+    while True:
+        try:
+            shutil.rmtree(b["base"])
+            break
+        except PermissionError:
+            if time.time() > end:
+                raise
+            time.sleep(0.5)
+        except FileNotFoundError:
+            break                       # an earlier try took the last of it
     shutil.copytree(b["base"].with_name(f"world.{tag}"), b["base"], symlinks=True)
 
 

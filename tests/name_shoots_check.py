@@ -678,6 +678,52 @@ def the_page(work, shot=None):
         chrome_drive.stop_all()
 
 
+JUST_FINISHED = r"""
+import json, sys
+from datetime import datetime
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import name_shoots as N
+studio = Path(sys.argv[2])
+studio.mkdir(parents=True, exist_ok=True)
+rec = {"state": "working", "backup": studio.name, "records": str(studio), "ask": {"names": {"s1": "Katie"}, "mini": False, "mini_name": ""},
+       "todo": [["s1", "Katie"]], "done": 0, "total": 1, "now": "", "line": "", "started": datetime.now().isoformat(timespec="seconds"),
+       "finished": None, "pid": 4242}
+N.job_write(studio, rec)
+looks = {"n": 0}
+def ended_meanwhile(tag):
+    # the job finishes between the page server's two looks: its record says done, its lock is free
+    looks["n"] += 1
+    if sys.argv[3] == "finished":
+        N.job_write(studio, dict(rec, state="done", done=1, finished=rec["started"]))
+    return False
+N.job_running = ended_meanwhile
+got = N.job_state(studio) or {}
+print(json.dumps({"state": got.get("state"), "line": got.get("line"), "looks": looks["n"]}))
+"""
+
+
+def just_finished(work):
+    """A job's record and "is it still running?" are two looks. A job that ended between them was told as cut
+    off ("Press Finish it") though it had just finished: GitHub's Mac caught it once (Nov 23). Played here by
+    having the job finish exactly between the two looks."""
+    print("A job that finishes between the page server's two looks at it")
+    env = dict(os.environ, STUDIO_HOME=str(work / "just-finished-home"), PYTHONIOENCODING="utf-8", STUDIO_NO_WINDOWS_FOR_TESTS="1")
+
+    def ask(how):
+        r = subprocess.run([sys.executable, "-c", JUST_FINISHED, str(t.SCRIPTS), str(work / "just-finished" / how / "a backup"), how],
+                           env=env, capture_output=True, text=True, timeout=60)
+        try:
+            return json.loads(r.stdout.strip().splitlines()[-1])
+        except (ValueError, IndexError):
+            return {"error": (r.stdout + r.stderr)[-700:]}
+    got = ask("finished")
+    check("it is told as done, never as cut off with 'Press Finish it'", got.get("state") == "done" and not got.get("line") and got.get("looks", 0) >= 1, got)
+    got = ask("died")
+    check("a job that really died (its record still says working, its lock free) is still told as stopped, in plain words",
+          got.get("state") == "stopped" and bool(got.get("line")), got)
+
+
 def main():
     chrome = "--chrome" in sys.argv
     shot = sys.argv[sys.argv.index("--shot") + 1] if "--shot" in sys.argv else None
@@ -687,6 +733,7 @@ def main():
         the_instructions()
         the_routes(work)
         cut_off_and_stuck(work)
+        just_finished(work)
         the_report(work)
         if chrome:
             the_page(work, shot)

@@ -1062,11 +1062,13 @@ def video_picker(t, c, s, kit, W, rev, moved, toast, full, shots, pick_words, ba
     n0 = len([1 for r_ in list(c.requests) if "/reel-footage" in r_["url"]])
     c.click("#vpRefresh")
     c.wait_for("document.querySelectorAll('#vpList .vcard').length === 1", 15)
+    # at least one ask since the press. Not "exactly one": while a video is getting ready the window looks again by
+    # itself, and on a slow Mac (GitHub's, Nov 23) that second look had already gone out by the time this line ran.
     n1 = len([1 for r_ in list(c.requests) if "/reel-footage" in r_["url"]])
     card = c.js("(function(){ var b = document.querySelector('#vpList .vcard'); return [b.querySelector('b').textContent, b.querySelector('span').textContent, b.disabled, b.tagName]; })()")
     first_time = card[1] != "0:03"
     case("I added videos reads the folder again: the new video is there by name" + (", \"getting it ready\", and can't be opened yet" if first_time else ""),
-         n1 == n0 + 1 and card[0] == "bts.mp4" and card[3] == "BUTTON" and ((card[1].endswith(" · getting it ready") and card[2] is True) if first_time else True), card)
+         n1 >= n0 + 1 and card[0] == "bts.mp4" and card[3] == "BUTTON" and ((card[1].endswith(" · getting it ready") and card[2] is True) if first_time else True), card)
     asked = [r_["url"] for r_ in list(c.requests) if "/reel-footage" in r_["url"]]
     case("the list is the reel page's own, asked for=talking: the reel page's record is neither made nor written",
          all(u.endswith("&for=talking") for u in asked) and not (kit / ".kit" / "reel-page.json").exists(), asked[:2])
